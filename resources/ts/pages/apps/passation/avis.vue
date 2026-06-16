@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { MODE_PASSATION_OPTIONS, modePassationLabel } from '@/constants/modesPassation'
 import { useAvisStore } from '@/stores/avis'
 import { useFournisseursStore } from '@/stores/fournisseurs'
+import type { Fournisseur } from '@/stores/fournisseurs'
+import { useExpressionsBesoinStore } from '@/stores/expressionsBesoin'
 
 const formatDate = (v: string | null | undefined) => {
   if (!v) return '-'
@@ -13,6 +16,7 @@ definePage({ meta: { title: 'Avis de Passation' } })
 
 const store = useAvisStore()
 const fournisseursStore = useFournisseursStore()
+const expressionsStore = useExpressionsBesoinStore()
 const snackbar = ref({ show: false, text: '', color: 'success' })
 const dialog = ref(false)
 const deleteDialog = ref(false)
@@ -23,8 +27,56 @@ const motifRejet = ref('')
 const activeTab = ref('general')
 const formRef = ref<any>(null)
 
-const requiredRule = (v: string) => !!v?.trim() || 'Ce champ est obligatoire'
+const requiredRule = (v: unknown) => !!String(v ?? '').trim() || 'Ce champ est obligatoire'
 const dureeRule = (v: number | null) => (v != null && v > 0) || 'Ce champ est obligatoire'
+const expressionRule = (v: number | null) => (v != null && v > 0) || 'Sélectionnez une expression de besoin'
+
+const formatApiErrors = (e: any) => {
+  const errors = e?.data?.errors
+  if (errors && typeof errors === 'object')
+    return Object.values(errors).flat().join(' · ')
+
+  return e?.data?.message || e?.message || 'Une erreur est survenue'
+}
+
+const buildAvisPayload = () => {
+  const items = form.value.items
+    .filter((item: any) => item.expression_besoin_id != null)
+    .map((item: any) => ({
+      expression_besoin_id: item.expression_besoin_id,
+      designation: item.designation,
+      description_detaillee: item.description_detaillee || undefined,
+      quantite: item.quantite ?? 1,
+      unite: item.unite || undefined,
+      lieu: item.lieu || undefined,
+    }))
+
+  const payload: Record<string, any> = {
+    reference: form.value.reference?.trim(),
+    objet: form.value.objet?.trim(),
+    mode_passation: form.value.mode_passation,
+    exercice: String(form.value.exercice ?? '').trim(),
+    duree: Number(form.value.duree),
+    date_limite_depot: form.value.date_limite_depot,
+    date_ouverture_plis: form.value.date_ouverture_plis,
+    date_publication: form.value.date_publication,
+    statut: form.value.statut,
+    fournisseurs: form.value.fournisseurs,
+  }
+
+  if (form.value.article_pour?.trim())
+    payload.article_pour = form.value.article_pour.trim()
+  if (form.value.article_relatif?.trim())
+    payload.article_relatif = form.value.article_relatif.trim()
+  if (form.value.delai != null && form.value.delai > 0)
+    payload.delai = Number(form.value.delai)
+  if (form.value.observations?.trim())
+    payload.observations = form.value.observations.trim()
+  if (items.length)
+    payload.items = items
+
+  return payload
+}
 
 // Filtres
 const searchQuery = ref('')
@@ -41,13 +93,7 @@ const itemsPerPage = ref(10)
 const page = ref(1)
 const sortBy = ref([{ key: 'created_at', order: 'desc' }])
 
-const modeOptions = [
-  { title: 'Appel d\'offres ouvert', value: 'AO_OUVERT' },
-  { title: 'Appel d\'offres restreint', value: 'AO_RESTREINT' },
-  { title: 'Consultation', value: 'CONSULTATION' },
-  { title: 'Gré à gré', value: 'GRE_A_GRE' },
-  { title: 'Entente directe', value: 'ENTENTE_DIRECTE' },
-]
+const modeOptions = MODE_PASSATION_OPTIONS
 
 const statutOptions = [
   { title: 'Brouillon', value: 'draft' },
@@ -71,10 +117,35 @@ const statutLabel = (s: string) => ({
 
 const detailsDialog = ref(false)
 const detailsItem = ref<any>(null)
+const detailsLoading = ref(false)
+
+const itemDesignation = (item: any) =>
+  item?.designation
+  || item?.expression_besoin?.libelle
+  || item?.expressionBesoin?.libelle
+  || '-'
+
+const itemExpressionCode = (item: any) =>
+  item?.expression_besoin?.code ?? item?.expressionBesoin?.code ?? null
 
 const openDetails = async (item: any) => {
-  detailsItem.value = await store.fetchAvisById(item.id)
   detailsDialog.value = true
+  detailsLoading.value = true
+  detailsItem.value = null
+  try {
+    detailsItem.value = await store.fetchAvisById(item.id)
+  }
+  finally {
+    detailsLoading.value = false
+  }
+}
+
+const editFromDetails = async () => {
+  if (!detailsItem.value)
+    return
+  const item = { ...detailsItem.value }
+  detailsDialog.value = false
+  await openEdit(item)
 }
 
 const headers = [
@@ -85,7 +156,7 @@ const headers = [
   { title: 'Date limite', key: 'date_limite_depot', sortable: true },
   { title: 'Date ouverture', key: 'date_ouverture_plis', sortable: true },
   { title: 'Statut', key: 'statut', sortable: true },
-  { title: 'Actions', key: 'actions', sortable: false, width: '200px' },
+  { title: 'Actions', key: 'actions', sortable: false, width: '1%', align: 'end' },
 ]
 
 const emptyForm = () => ({
@@ -99,6 +170,41 @@ const emptyForm = () => ({
 })
 
 const form = ref(emptyForm())
+
+const isFournisseurEligible = (f: Fournisseur) => {
+  const modes = f.modes_passation ?? []
+  if (modes.length > 0 && form.value.mode_passation && !modes.includes(form.value.mode_passation))
+    return false
+
+  const duree = form.value.duree
+  if (duree != null && duree > 0) {
+    if (f.duree_min != null && duree < f.duree_min)
+      return false
+    if (f.duree_max != null && duree > f.duree_max)
+      return false
+  }
+
+  return true
+}
+
+const eligibleFournisseurOptions = computed(() =>
+  fournisseursStore.fournisseurs
+    .filter(isFournisseurEligible)
+    .map(f => ({
+      title: `${f.raison_sociale}${f.sigle ? ` (${f.sigle})` : ''}`,
+      value: f.id,
+    })),
+)
+
+const pruneIneligibleFournisseurs = () => {
+  const eligibleIds = new Set(eligibleFournisseurOptions.value.map(o => o.value))
+  form.value.fournisseurs = form.value.fournisseurs.filter(id => eligibleIds.has(id))
+}
+
+watch(
+  () => [form.value.mode_passation, form.value.duree] as const,
+  pruneIneligibleFournisseurs,
+)
 
 const loadData = async () => {
   await store.fetchAvis({
@@ -121,6 +227,7 @@ onMounted(async () => {
   await Promise.all([
     loadData(),
     fournisseursStore.fetchFournisseurs({ itemsPerPage: -1, statut: 'actif' }),
+    expressionsStore.fetchExpressions({ itemsPerPage: -1, actif: true }),
   ])
 })
 
@@ -165,7 +272,32 @@ const openReject = (item: any) => {
 }
 
 const addItem = () => {
-  form.value.items.push({ designation: '', description_detaillee: '', quantite: 1, unite: '', lieu: '' })
+  form.value.items.push({
+    expression_besoin_id: null,
+    designation: '',
+    description_detaillee: '',
+    quantite: 1,
+    unite: '',
+    lieu: '',
+  })
+}
+
+const expressionOptions = computed(() =>
+  expressionsStore.expressions.map(e => ({
+    title: `${e.code} — ${e.libelle}`,
+    value: e.id,
+  })),
+)
+
+const applyExpressionToItem = (item: any, expressionId: number | null) => {
+  item.expression_besoin_id = expressionId
+  const expression = expressionsStore.expressions.find(e => e.id === expressionId)
+  if (!expression)
+    return
+
+  item.designation = expression.libelle
+  item.description_detaillee = expression.description ?? ''
+  item.unite = expression.unite_defaut ?? item.unite ?? ''
 }
 
 const removeItem = (index: number) => {
@@ -173,24 +305,33 @@ const removeItem = (index: number) => {
 }
 
 const save = async () => {
-  const { valid } = await formRef.value?.validate()
-  if (!valid) {
-    activeTab.value = 'general'
-    snackbar.value = { show: true, text: 'Veuillez renseigner la durée de la consultation et les dates obligatoires', color: 'error' }
+  const incompleteItems = form.value.items.some((item: any) => !item.expression_besoin_id)
+  if (incompleteItems) {
+    activeTab.value = 'items'
+    snackbar.value = { show: true, text: 'Chaque ligne doit avoir une expression de besoin sélectionnée', color: 'error' }
     return
   }
 
+  const { valid } = await formRef.value?.validate()
+  if (!valid) {
+    activeTab.value = 'general'
+    snackbar.value = { show: true, text: 'Veuillez renseigner tous les champs obligatoires', color: 'error' }
+    return
+  }
+
+  const payload = buildAvisPayload()
+
   try {
     if (isEditing.value)
-      await store.updateAvis(selectedItem.value.id, form.value)
+      await store.updateAvis(selectedItem.value.id, payload)
     else
-      await store.createAvis(form.value)
+      await store.createAvis(payload)
     dialog.value = false
     snackbar.value = { show: true, text: `Avis ${isEditing.value ? 'modifié' : 'créé'} avec succès`, color: 'success' }
     await loadData()
   }
   catch (e: any) {
-    snackbar.value = { show: true, text: e?.data?.message || 'Une erreur est survenue', color: 'error' }
+    snackbar.value = { show: true, text: formatApiErrors(e), color: 'error' }
   }
 }
 
@@ -343,7 +484,7 @@ const resetDateFilters = () => {
               <span class="text-truncate d-inline-block" style="max-width:220px" :title="item.objet">{{ item.objet }}</span>
             </template>
             <template #item.mode_passation="{ item }">
-              <VChip size="x-small" variant="tonal" color="info">{{ item.mode_passation }}</VChip>
+              <VChip size="x-small" variant="tonal" color="info">{{ modePassationLabel(item.mode_passation) }}</VChip>
             </template>
             <template #item.date_limite_depot="{ item }">
               <span class="text-caption">{{ formatDate(item.date_limite_depot) }}</span>
@@ -355,53 +496,55 @@ const resetDateFilters = () => {
               <VChip :color="statutColor(item.statut)" size="small">{{ statutLabel(item.statut) }}</VChip>
             </template>
             <template #item.actions="{ item }">
-              <!-- Détails -->
-              <VBtn icon variant="text" size="small" color="secondary" @click="openDetails(item)">
-                <VIcon icon="tabler-eye" />
-                <VTooltip activator="parent">Détails</VTooltip>
-              </VBtn>
+              <div class="avis-row-actions d-flex align-center justify-end flex-nowrap">
+                <!-- Détails -->
+                <VBtn icon variant="text" size="small" color="secondary" @click="openDetails(item)">
+                  <VIcon icon="tabler-eye" size="20" />
+                  <VTooltip activator="parent" location="top">Détails</VTooltip>
+                </VBtn>
 
-              <!-- Éditer -->
-              <VBtn icon variant="text" size="small" color="primary" @click="openEdit(item)">
-                <VIcon icon="tabler-edit" />
-                <VTooltip activator="parent">Modifier</VTooltip>
-              </VBtn>
+                <!-- Éditer -->
+                <VBtn icon variant="text" size="small" color="primary" @click="openEdit(item)">
+                  <VIcon icon="tabler-edit" size="20" />
+                  <VTooltip activator="parent" location="top">Modifier</VTooltip>
+                </VBtn>
 
-              <!-- Soumettre (draft → submitted) -->
-              <VBtn v-if="item.statut === 'draft'" icon variant="text" size="small" color="info" @click="doAction('submitAvis', item)">
-                <VIcon icon="tabler-send" />
-                <VTooltip activator="parent">Soumettre</VTooltip>
-              </VBtn>
+                <!-- Soumettre (draft → submitted) -->
+                <VBtn v-if="item.statut === 'draft'" icon variant="text" size="small" color="info" @click="doAction('submitAvis', item)">
+                  <VIcon icon="tabler-send" size="20" />
+                  <VTooltip activator="parent" location="top">Soumettre</VTooltip>
+                </VBtn>
 
-              <!-- Approuver (submitted → approved) -->
-              <VBtn v-if="item.statut === 'submitted'" icon variant="text" size="small" color="success" @click="doAction('approveAvis', item)">
-                <VIcon icon="tabler-check" />
-                <VTooltip activator="parent">Approuver</VTooltip>
-              </VBtn>
+                <!-- Approuver (submitted → approved) -->
+                <VBtn v-if="item.statut === 'submitted'" icon variant="text" size="small" color="success" @click="doAction('approveAvis', item)">
+                  <VIcon icon="tabler-check" size="20" />
+                  <VTooltip activator="parent" location="top">Approuver</VTooltip>
+                </VBtn>
 
-              <!-- Rejeter (submitted) -->
-              <VBtn v-if="item.statut === 'submitted'" icon variant="text" size="small" color="error" @click="openReject(item)">
-                <VIcon icon="tabler-x" />
-                <VTooltip activator="parent">Rejeter</VTooltip>
-              </VBtn>
+                <!-- Rejeter (submitted) -->
+                <VBtn v-if="item.statut === 'submitted'" icon variant="text" size="small" color="error" @click="openReject(item)">
+                  <VIcon icon="tabler-x" size="20" />
+                  <VTooltip activator="parent" location="top">Rejeter</VTooltip>
+                </VBtn>
 
-              <!-- Publier (approved → published) -->
-              <VBtn v-if="item.statut === 'approved'" icon variant="text" size="small" color="primary" @click="doAction('publishAvis', item)">
-                <VIcon icon="tabler-world" />
-                <VTooltip activator="parent">Publier</VTooltip>
-              </VBtn>
+                <!-- Publier (approved → published) -->
+                <VBtn v-if="item.statut === 'approved'" icon variant="text" size="small" color="primary" @click="doAction('publishAvis', item)">
+                  <VIcon icon="tabler-world" size="20" />
+                  <VTooltip activator="parent" location="top">Publier</VTooltip>
+                </VBtn>
 
-              <!-- Clore (published → closed) -->
-              <VBtn v-if="item.statut === 'published'" icon variant="text" size="small" color="warning" @click="doAction('closeAvis', item)">
-                <VIcon icon="tabler-lock" />
-                <VTooltip activator="parent">Clore</VTooltip>
-              </VBtn>
+                <!-- Clore (published → closed) -->
+                <VBtn v-if="item.statut === 'published'" icon variant="text" size="small" color="warning" @click="doAction('closeAvis', item)">
+                  <VIcon icon="tabler-lock" size="20" />
+                  <VTooltip activator="parent" location="top">Clore</VTooltip>
+                </VBtn>
 
-              <!-- Supprimer -->
-              <VBtn icon variant="text" size="small" color="error" @click="openDelete(item)">
-                <VIcon icon="tabler-trash" />
-                <VTooltip activator="parent">Supprimer</VTooltip>
-              </VBtn>
+                <!-- Supprimer -->
+                <VBtn icon variant="text" size="small" color="error" @click="openDelete(item)">
+                  <VIcon icon="tabler-trash" size="20" />
+                  <VTooltip activator="parent" location="top">Supprimer</VTooltip>
+                </VBtn>
+              </div>
             </template>
           </VDataTableServer>
         </VCardText>
@@ -440,16 +583,16 @@ const resetDateFilters = () => {
             <VTabsWindowItem value="general">
               <VRow class="mt-1">
                 <VCol cols="12" md="4">
-                  <VTextField v-model="form.reference" label="Référence *" placeholder="AO-2026-001" />
+                  <VTextField v-model="form.reference" label="Référence *" placeholder="AO-2026-001" :rules="[requiredRule]" />
                 </VCol>
                 <VCol cols="12" md="4">
-                  <VSelect v-model="form.mode_passation" :items="modeOptions" label="Mode de passation *" />
+                  <VSelect v-model="form.mode_passation" :items="modeOptions" label="Mode de passation *" :rules="[requiredRule]" />
                 </VCol>
                 <VCol cols="12" md="4">
-                  <VTextField v-model="form.exercice" label="Exercice *" placeholder="2026" />
+                  <VTextField v-model="form.exercice" label="Exercice *" placeholder="2026" :rules="[requiredRule]" />
                 </VCol>
                 <VCol cols="12">
-                  <VTextField v-model="form.objet" label="Objet *" placeholder="Acquisition de matériel informatique..." />
+                  <VTextField v-model="form.objet" label="Objet *" placeholder="Acquisition de matériel informatique..." :rules="[requiredRule]" />
                 </VCol>
                 <VCol cols="12" md="6">
                   <VTextField v-model="form.article_pour" label="Article pour" />
@@ -488,20 +631,31 @@ const resetDateFilters = () => {
             <!-- ── Onglet Fournisseurs invités ── -->
             <VTabsWindowItem value="fournisseurs">
               <div class="mt-2">
+                <VAlert
+                  v-if="!form.mode_passation || !form.duree"
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                  class="mb-3"
+                >
+                  Renseignez le mode de passation et la durée de la consultation dans l'onglet Informations générales pour filtrer les fournisseurs éligibles.
+                </VAlert>
                 <p class="text-body-2 text-medium-emphasis mb-3">
-                  Sélectionnez les fournisseurs à inviter à soumissionner pour cet avis.
+                  Fournisseurs éligibles pour le mode <strong>{{ form.mode_passation }}</strong>
+                  <template v-if="form.duree"> et une durée de <strong>{{ form.duree }} jour(s)</strong></template>.
                 </p>
                 <VAutocomplete
                   v-model="form.fournisseurs"
-                  :items="fournisseursStore.fournisseurs.map(f => ({ title: `${f.raison_sociale}${f.sigle ? ' (' + f.sigle + ')' : ''}`, value: f.id }))"
+                  :items="eligibleFournisseurOptions"
                   label="Fournisseurs invités"
                   multiple
                   chips
                   closable-chips
                   prepend-inner-icon="tabler-building-store"
+                  :no-data-text="form.mode_passation && form.duree ? 'Aucun fournisseur éligible' : 'Complétez le mode et la durée de l\'avis'"
                 />
                 <div v-if="form.fournisseurs.length > 0" class="mt-3">
-                  <p class="text-caption text-medium-emphasis">{{ form.fournisseurs.length }} fournisseur(s) sélectionné(s)</p>
+                  <p class="text-caption text-medium-emphasis">{{ form.fournisseurs.length }} fournisseur(s) sélectionné(s) sur {{ eligibleFournisseurOptions.length }} éligible(s)</p>
                 </div>
               </div>
             </VTabsWindowItem>
@@ -509,6 +663,22 @@ const resetDateFilters = () => {
             <!-- ── Onglet Fournitures / Lignes ── -->
             <VTabsWindowItem value="items">
               <div class="mt-2">
+                <p class="text-body-2 text-medium-emphasis mb-3">
+                  Sélectionnez une expression de besoin du référentiel pour chaque ligne.
+                  <RouterLink :to="{ name: 'apps-referentiels-expressions-besoin' }" class="text-primary">
+                    Gérer le catalogue
+                  </RouterLink>
+                </p>
+                <VAlert
+                  v-if="expressionsStore.expressions.length === 0"
+                  type="warning"
+                  variant="tonal"
+                  density="compact"
+                  class="mb-3"
+                >
+                  Aucune expression de besoin disponible. Créez-en dans le référentiel ou exécutez le seeder
+                  <code class="text-caption">php artisan db:seed --class=ExpressionBesoinSeeder</code>.
+                </VAlert>
                 <div v-if="form.items.length === 0" class="text-center py-6 text-medium-emphasis">
                   <VIcon icon="tabler-list" size="40" class="mb-2 opacity-30" />
                   <p class="text-body-2">Aucune ligne ajoutée</p>
@@ -528,7 +698,14 @@ const resetDateFilters = () => {
                   </div>
                   <VRow>
                     <VCol cols="12" md="6">
-                      <VTextField v-model="item.designation" label="Désignation *" density="compact" />
+                      <VAutocomplete
+                        :model-value="item.expression_besoin_id"
+                        :items="expressionOptions"
+                        label="Expression de besoin *"
+                        density="compact"
+                        :rules="[expressionRule]"
+                        @update:model-value="applyExpressionToItem(item, $event)"
+                      />
                     </VCol>
                     <VCol cols="12" md="3">
                       <VTextField v-model.number="item.quantite" label="Qté" type="number" density="compact" />
@@ -612,78 +789,144 @@ const resetDateFilters = () => {
   </VDialog>
 
   <!-- ─── Dialog Détails ─── -->
-  <VDialog v-model="detailsDialog" max-width="750" scrollable>
-    <VCard v-if="detailsItem">
-      <VCardTitle class="d-flex align-center gap-2 pa-4">
-        <VIcon icon="tabler-file-description" color="primary" />
-        {{ detailsItem.reference }}
-        <VSpacer />
-        <VChip :color="statutColor(detailsItem.statut)" size="small">{{ statutLabel(detailsItem.statut) }}</VChip>
-      </VCardTitle>
+  <VDialog v-model="detailsDialog" max-width="920" scrollable>
+    <VCard v-if="detailsLoading" class="pa-8">
+      <div class="d-flex flex-column align-center justify-center py-10">
+        <VProgressCircular indeterminate color="primary" size="48" />
+        <p class="text-body-2 text-medium-emphasis mt-4">Chargement des détails...</p>
+      </div>
+    </VCard>
+
+    <VCard v-else-if="detailsItem">
+      <!-- En-tête -->
+      <div class="avis-details-header pa-4 pa-sm-5">
+        <div class="d-flex flex-wrap align-center gap-3">
+          <VAvatar color="primary" variant="tonal" size="48" rounded>
+            <VIcon icon="tabler-file-description" size="26" />
+          </VAvatar>
+          <div class="flex-grow-1 min-w-0">
+            <p class="text-caption text-medium-emphasis mb-1">Avis de passation</p>
+            <h2 class="text-h5 font-weight-bold mb-1">{{ detailsItem.reference }}</h2>
+            <p class="text-body-2 text-medium-emphasis text-truncate mb-0">{{ detailsItem.objet }}</p>
+          </div>
+          <VChip :color="statutColor(detailsItem.statut)" size="small" class="font-weight-medium">
+            {{ statutLabel(detailsItem.statut) }}
+          </VChip>
+        </div>
+      </div>
+
       <VDivider />
-      <VCardText class="pa-4">
-        <!-- Informations générales -->
-        <p class="text-subtitle-2 font-weight-bold mb-3">Informations générales</p>
-        <VRow dense>
-          <VCol cols="12" md="8">
-            <p class="text-caption text-medium-emphasis">Objet</p>
-            <p class="text-body-2 mb-3">{{ detailsItem.objet }}</p>
+
+      <VCardText class="pa-4 pa-sm-5">
+        <VAlert
+          v-if="detailsItem.motif_rejet"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          icon="tabler-alert-circle"
+        >
+          <strong>Motif du rejet :</strong> {{ detailsItem.motif_rejet }}
+        </VAlert>
+
+        <!-- Synthèse -->
+        <VRow class="mb-2">
+          <VCol cols="12" sm="6" md="3">
+            <VCard variant="tonal" color="info" class="h-100">
+              <VCardText class="pa-3">
+                <div class="d-flex align-center gap-2 mb-1">
+                  <VIcon icon="tabler-gavel" size="18" />
+                  <span class="text-caption font-weight-medium">Mode</span>
+                </div>
+                <p class="text-body-2 font-weight-medium mb-0">{{ modePassationLabel(detailsItem.mode_passation) }}</p>
+              </VCardText>
+            </VCard>
+          </VCol>
+          <VCol cols="6" sm="3" md="3">
+            <VCard variant="outlined" class="h-100">
+              <VCardText class="pa-3">
+                <div class="d-flex align-center gap-2 mb-1">
+                  <VIcon icon="tabler-calendar" size="18" color="primary" />
+                  <span class="text-caption text-medium-emphasis">Exercice</span>
+                </div>
+                <p class="text-h6 font-weight-bold mb-0">{{ detailsItem.exercice }}</p>
+              </VCardText>
+            </VCard>
+          </VCol>
+          <VCol cols="6" sm="3" md="3">
+            <VCard variant="outlined" class="h-100">
+              <VCardText class="pa-3">
+                <div class="d-flex align-center gap-2 mb-1">
+                  <VIcon icon="tabler-clock" size="18" color="primary" />
+                  <span class="text-caption text-medium-emphasis">Durée consultation</span>
+                </div>
+                <p class="text-h6 font-weight-bold mb-0">{{ detailsItem.duree ?? '-' }} <span class="text-caption font-weight-regular">j</span></p>
+              </VCardText>
+            </VCard>
+          </VCol>
+          <VCol cols="12" sm="6" md="3">
+            <VCard variant="outlined" class="h-100">
+              <VCardText class="pa-3">
+                <div class="d-flex align-center gap-2 mb-1">
+                  <VIcon icon="tabler-truck-delivery" size="18" color="primary" />
+                  <span class="text-caption text-medium-emphasis">Délai d'exécution</span>
+                </div>
+                <p class="text-h6 font-weight-bold mb-0">{{ detailsItem.delai ?? '-' }} <span class="text-caption font-weight-regular">j</span></p>
+              </VCardText>
+            </VCard>
+          </VCol>
+        </VRow>
+
+        <!-- Calendrier -->
+        <p class="text-subtitle-2 font-weight-bold d-flex align-center gap-2 mb-3 mt-2">
+          <VIcon icon="tabler-calendar-event" size="20" />
+          Calendrier
+        </p>
+        <VRow dense class="mb-4">
+          <VCol cols="12" md="4">
+            <div class="avis-details-date-box pa-3 rounded border">
+              <p class="text-caption text-medium-emphasis mb-1">Date de publication</p>
+              <p class="text-body-1 font-weight-medium mb-0">{{ formatDate(detailsItem.date_publication) }}</p>
+            </div>
           </VCol>
           <VCol cols="12" md="4">
-            <p class="text-caption text-medium-emphasis">Mode de passation</p>
-            <VChip size="x-small" variant="tonal" color="info" class="mb-3">{{ detailsItem.mode_passation }}</VChip>
+            <div class="avis-details-date-box pa-3 rounded border">
+              <p class="text-caption text-medium-emphasis mb-1">Date limite de dépôt</p>
+              <p class="text-body-1 font-weight-medium mb-0">{{ formatDate(detailsItem.date_limite_depot) }}</p>
+            </div>
           </VCol>
-          <VCol cols="6" md="3">
-            <p class="text-caption text-medium-emphasis">Exercice</p>
-            <p class="text-body-2 mb-2">{{ detailsItem.exercice }}</p>
+          <VCol cols="12" md="4">
+            <div class="avis-details-date-box pa-3 rounded border">
+              <p class="text-caption text-medium-emphasis mb-1">Date d'ouverture des plis</p>
+              <p class="text-body-1 font-weight-medium mb-0">{{ formatDate(detailsItem.date_ouverture_plis) }}</p>
+            </div>
           </VCol>
-          <VCol cols="6" md="3">
-            <p class="text-caption text-medium-emphasis">Durée de la consultation (jours)</p>
-            <p class="text-body-2 mb-2">{{ detailsItem.duree ?? '-' }}</p>
-          </VCol>
-          <VCol cols="6" md="3">
-            <p class="text-caption text-medium-emphasis">Délai d'exécution (jours)</p>
-            <p class="text-body-2 mb-2">{{ detailsItem.delai ?? '-' }}</p>
-          </VCol>
-          <VCol cols="6" md="3">
-            <p class="text-caption text-medium-emphasis">Date limite dépôt</p>
-            <p class="text-body-2 mb-2">{{ formatDate(detailsItem.date_limite_depot) }}</p>
-          </VCol>
-          <VCol cols="6" md="3">
-            <p class="text-caption text-medium-emphasis">Date ouverture plis</p>
-            <p class="text-body-2 mb-2">{{ formatDate(detailsItem.date_ouverture_plis) }}</p>
-          </VCol>
-          <VCol cols="6" md="3">
-            <p class="text-caption text-medium-emphasis">Date de publication</p>
-            <p class="text-body-2 mb-2">{{ formatDate(detailsItem.date_publication) }}</p>
-          </VCol>
+        </VRow>
+
+        <!-- Articles -->
+        <VRow v-if="detailsItem.article_pour || detailsItem.article_relatif" dense class="mb-4">
           <VCol v-if="detailsItem.article_pour" cols="12" md="6">
-            <p class="text-caption text-medium-emphasis">Article pour</p>
-            <p class="text-body-2 mb-2">{{ detailsItem.article_pour }}</p>
+            <div class="pa-3 rounded border">
+              <p class="text-caption text-medium-emphasis mb-1">Article pour</p>
+              <p class="text-body-2 mb-0">{{ detailsItem.article_pour }}</p>
+            </div>
           </VCol>
           <VCol v-if="detailsItem.article_relatif" cols="12" md="6">
-            <p class="text-caption text-medium-emphasis">Article relatif</p>
-            <p class="text-body-2 mb-2">{{ detailsItem.article_relatif }}</p>
-          </VCol>
-          <VCol v-if="detailsItem.motif_rejet" cols="12">
-            <VAlert type="error" variant="tonal" density="compact" class="mb-2">
-              <strong>Motif du rejet :</strong> {{ detailsItem.motif_rejet }}
-            </VAlert>
-          </VCol>
-          <VCol v-if="detailsItem.observations" cols="12">
-            <p class="text-caption text-medium-emphasis">Observations</p>
-            <p class="text-body-2 mb-2">{{ detailsItem.observations }}</p>
+            <div class="pa-3 rounded border">
+              <p class="text-caption text-medium-emphasis mb-1">Article relatif</p>
+              <p class="text-body-2 mb-0">{{ detailsItem.article_relatif }}</p>
+            </div>
           </VCol>
         </VRow>
 
         <!-- Fournisseurs -->
-        <template v-if="detailsItem.fournisseurs?.length">
-          <VDivider class="my-3" />
-          <p class="text-subtitle-2 font-weight-bold mb-2">
+        <div class="mb-4">
+          <p class="text-subtitle-2 font-weight-bold d-flex align-center gap-2 mb-3">
+            <VIcon icon="tabler-building-store" size="20" />
             Fournisseurs invités
-            <VChip size="x-small" color="primary" class="ms-1">{{ detailsItem.fournisseurs.length }}</VChip>
+            <VChip size="x-small" color="primary" variant="tonal">{{ detailsItem.fournisseurs?.length ?? 0 }}</VChip>
           </p>
-          <div class="d-flex flex-wrap gap-2">
+          <div v-if="detailsItem.fournisseurs?.length" class="d-flex flex-wrap gap-2">
             <VChip
               v-for="f in detailsItem.fournisseurs"
               :key="f.id"
@@ -695,39 +938,72 @@ const resetDateFilters = () => {
               {{ f.raison_sociale }}{{ f.sigle ? ` (${f.sigle})` : '' }}
             </VChip>
           </div>
-        </template>
+          <p v-else class="text-body-2 text-medium-emphasis mb-0">Aucun fournisseur invité.</p>
+        </div>
 
-        <!-- Lignes / Items -->
-        <template v-if="detailsItem.items?.length">
-          <VDivider class="my-3" />
-          <p class="text-subtitle-2 font-weight-bold mb-2">
+        <!-- Lignes -->
+        <div class="mb-2">
+          <p class="text-subtitle-2 font-weight-bold d-flex align-center gap-2 mb-3">
+            <VIcon icon="tabler-list-details" size="20" />
             Fournitures / Lignes
-            <VChip size="x-small" color="primary" class="ms-1">{{ detailsItem.items.length }}</VChip>
+            <VChip size="x-small" color="primary" variant="tonal">{{ detailsItem.items?.length ?? 0 }}</VChip>
           </p>
-          <VTable density="compact">
+
+          <VTable v-if="detailsItem.items?.length" density="comfortable" class="avis-details-table rounded border">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Désignation</th>
-                <th>Qté</th>
-                <th>Unité</th>
-                <th>Lieu</th>
+                <th class="text-caption font-weight-bold">#</th>
+                <th class="text-caption font-weight-bold">Code</th>
+                <th class="text-caption font-weight-bold">Expression / Désignation</th>
+                <th class="text-caption font-weight-bold text-end">Qté</th>
+                <th class="text-caption font-weight-bold">Unité</th>
+                <th class="text-caption font-weight-bold">Lieu</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in detailsItem.items" :key="item.id">
-                <td>{{ item.ordre }}</td>
-                <td>{{ item.designation }}</td>
-                <td>{{ item.quantite }}</td>
-                <td>{{ item.unite ?? '-' }}</td>
-                <td>{{ item.lieu ?? '-' }}</td>
+              <tr v-for="(item, index) in detailsItem.items" :key="item.id ?? `line-${index}`">
+                <td class="text-medium-emphasis">{{ item.ordre ?? index + 1 }}</td>
+                <td>
+                  <VChip v-if="itemExpressionCode(item)" size="x-small" variant="outlined" color="primary">
+                    {{ itemExpressionCode(item) }}
+                  </VChip>
+                  <span v-else class="text-caption">-</span>
+                </td>
+                <td>
+                  <p class="text-body-2 font-weight-medium mb-0">{{ itemDesignation(item) }}</p>
+                  <p v-if="item.description_detaillee" class="text-caption text-medium-emphasis mb-0 mt-1">
+                    {{ item.description_detaillee }}
+                  </p>
+                </td>
+                <td class="text-end font-weight-medium">{{ item.quantite ?? '-' }}</td>
+                <td>{{ item.unite || '-' }}</td>
+                <td>{{ item.lieu || '-' }}</td>
               </tr>
             </tbody>
           </VTable>
-        </template>
+          <VAlert v-else type="info" variant="tonal" density="compact">
+            Aucune ligne de fourniture enregistrée pour cet avis.
+          </VAlert>
+        </div>
+
+        <VExpandTransition>
+          <div v-if="detailsItem.observations" class="mt-4">
+            <p class="text-subtitle-2 font-weight-bold d-flex align-center gap-2 mb-2">
+              <VIcon icon="tabler-notes" size="20" />
+              Observations
+            </p>
+            <VCard variant="tonal" color="secondary">
+              <VCardText class="text-body-2">{{ detailsItem.observations }}</VCardText>
+            </VCard>
+          </div>
+        </VExpandTransition>
       </VCardText>
+
       <VDivider />
-      <VCardActions class="justify-end pa-3">
+      <VCardActions class="justify-space-between pa-4">
+        <VBtn variant="text" prepend-icon="tabler-pencil" color="primary" @click="editFromDetails">
+          Modifier
+        </VBtn>
         <VBtn variant="tonal" @click="detailsDialog = false">Fermer</VBtn>
       </VCardActions>
     </VCard>
@@ -737,3 +1013,21 @@ const resetDateFilters = () => {
     {{ snackbar.text }}
   </VSnackbar>
 </template>
+
+<style scoped>
+.avis-details-header {
+  background: rgb(var(--v-theme-surface-variant), 0.35);
+}
+
+.avis-details-date-box {
+  border-color: rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+  background: rgb(var(--v-theme-surface));
+  block-size: 100%;
+}
+
+.avis-row-actions {
+  gap: 0;
+  min-inline-size: max-content;
+  white-space: nowrap;
+}
+</style>

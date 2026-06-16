@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Avis;
+use App\Models\ExpressionBesoin;
 use App\Models\Fournisseur;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,6 +69,19 @@ class AvisTest extends TestCase
 
     public function test_can_create_avis_with_items(): void
     {
+        $expression1 = ExpressionBesoin::create([
+            'uuid'    => \Illuminate\Support\Str::uuid(),
+            'code'    => 'EB-AVIS-001',
+            'libelle' => 'Ordinateurs portables',
+            'actif'   => true,
+        ]);
+        $expression2 = ExpressionBesoin::create([
+            'uuid'    => \Illuminate\Support\Str::uuid(),
+            'code'    => 'EB-AVIS-002',
+            'libelle' => 'Imprimantes',
+            'actif'   => true,
+        ]);
+
         $response = $this->withHeaders($this->authHeader())->postJson('/api/avis', [
             'reference'           => 'CANAM/AO/2026/TEST-003',
             'objet'               => 'Avis avec lignes',
@@ -78,13 +92,14 @@ class AvisTest extends TestCase
             'date_ouverture_plis' => '2026-08-03',
             'date_publication'    => '2026-06-15',
             'items'               => [
-                ['designation' => 'Ordinateurs portables', 'quantite' => 10, 'unite' => 'unité'],
-                ['designation' => 'Imprimantes', 'quantite' => 3, 'unite' => 'unité'],
+                ['expression_besoin_id' => $expression1->id, 'quantite' => 10, 'unite' => 'unité'],
+                ['expression_besoin_id' => $expression2->id, 'quantite' => 3, 'unite' => 'unité'],
             ],
         ]);
 
         $response->assertStatus(201);
         $this->assertDatabaseCount('avis_items', 2);
+        $this->assertDatabaseHas('avis_items', ['designation' => 'Ordinateurs portables']);
     }
 
     public function test_can_update_avis(): void
@@ -178,6 +193,24 @@ class AvisTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['reference']);
+    }
+
+  public function test_can_create_avis_with_submitted_statut(): void
+  {
+        $response = $this->withHeaders($this->authHeader())->postJson('/api/avis', [
+            'reference'           => 'CANAM/AO/2026/TEST-STATUT',
+            'objet'               => 'Avis soumis',
+            'mode_passation'      => 'CONSULTATION',
+            'exercice'            => '2026',
+            'duree'               => 15,
+            'date_limite_depot'   => '2026-07-15',
+            'date_ouverture_plis' => '2026-07-17',
+            'date_publication'    => '2026-06-01',
+            'statut'              => 'submitted',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment(['statut' => 'submitted']);
     }
 
     public function test_requires_authentication(): void

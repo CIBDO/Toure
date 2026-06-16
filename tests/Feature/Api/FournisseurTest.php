@@ -61,6 +61,7 @@ class FournisseurTest extends TestCase
                 'email'               => 'contact@nouveau.ml',
                 'ville'               => 'Bamako',
             'domaine_activite_id' => $domaine->id,
+            'modes_passation'     => ['CONSULTATION', 'AO_OUVERT'],
             'statut'              => 'actif',
         ]);
 
@@ -81,6 +82,7 @@ class FournisseurTest extends TestCase
         $response = $this->withHeaders($this->authHeader())->postJson('/api/fournisseurs', [
             'code'           => 'F-TEST-003',
             'raison_sociale' => 'Fournisseur avec banque',
+            'modes_passation'=> ['AO_OUVERT'],
             'statut'         => 'actif',
             'banques'        => [
                 [
@@ -109,6 +111,7 @@ class FournisseurTest extends TestCase
             ->putJson("/api/fournisseurs/{$fournisseur->id}", [
                 'code'           => 'F-TEST-004',
                 'raison_sociale' => 'Nouveau nom SARL',
+                'modes_passation'=> ['CONSULTATION'],
                 'statut'         => 'actif',
             ]);
 
@@ -145,6 +148,7 @@ class FournisseurTest extends TestCase
         $response = $this->withHeaders($this->authHeader())->postJson('/api/fournisseurs', [
             'code'           => 'F-UNIQUE',
             'raison_sociale' => 'Doublon',
+            'modes_passation'=> ['AO_OUVERT'],
             'statut'         => 'actif',
         ]);
 
@@ -164,5 +168,35 @@ class FournisseurTest extends TestCase
         $data = $response->json('data');
         $this->assertCount(1, $data);
         $this->assertEquals('actif', $data[0]['statut']);
+    }
+
+    public function test_can_filter_fournisseurs_by_mode_and_duree(): void
+    {
+        Fournisseur::create([
+            'uuid' => \Illuminate\Support\Str::uuid(),
+            'code' => 'F-MODE-1',
+            'raison_sociale' => 'Consultation only',
+            'modes_passation' => ['CONSULTATION'],
+            'duree_min' => 10,
+            'duree_max' => 30,
+            'statut' => 'actif',
+        ]);
+        Fournisseur::create([
+            'uuid' => \Illuminate\Support\Str::uuid(),
+            'code' => 'F-MODE-2',
+            'raison_sociale' => 'AO only',
+            'modes_passation' => ['AO_OUVERT'],
+            'duree_min' => 20,
+            'duree_max' => 60,
+            'statut' => 'actif',
+        ]);
+
+        $response = $this->withHeaders($this->authHeader())
+            ->getJson('/api/fournisseurs?mode_passation=CONSULTATION&duree=15&itemsPerPage=-1');
+
+        $response->assertStatus(200);
+        $codes = collect($response->json('data'))->pluck('code')->all();
+        $this->assertContains('F-MODE-1', $codes);
+        $this->assertNotContains('F-MODE-2', $codes);
     }
 }

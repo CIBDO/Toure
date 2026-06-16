@@ -34,6 +34,9 @@ export interface Fournisseur {
   fonction_representant?: string
   domaine_activite_id?: number
   domaine_activite?: { id: number; code: string; libelle: string }
+  modes_passation?: string[]
+  duree_min?: number | null
+  duree_max?: number | null
   statut: 'actif' | 'suspendu' | 'blackliste'
   observations?: string
   banques?: FournisseurBanque[]

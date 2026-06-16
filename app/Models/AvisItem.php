@@ -9,7 +9,7 @@ class AvisItem extends Model
     protected $table = 'avis_items';
 
     protected $fillable = [
-        'avis_id', 'ordre', 'designation', 'description_detaillee',
+        'avis_id', 'expression_besoin_id', 'ordre', 'designation', 'description_detaillee',
         'quantite', 'unite', 'lieu',
     ];
 
@@ -20,5 +20,10 @@ class AvisItem extends Model
     public function avis()
     {
         return $this->belongsTo(Avis::class);
+    }
+
+    public function expressionBesoin()
+    {
+        return $this->belongsTo(ExpressionBesoin::class, 'expression_besoin_id');
     }
 }

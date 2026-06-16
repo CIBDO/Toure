@@ -17,7 +17,14 @@ class Fournisseur extends Model
         'raison_sociale', 'sigle', 'nif', 'rc',
         'telephone', 'fax', 'email', 'adresse', 'ville', 'region', 'pays',
         'representant', 'fonction_representant',
-        'domaine_activite_id', 'statut', 'observations', 'created_by',
+        'domaine_activite_id', 'modes_passation', 'duree_min', 'duree_max',
+        'statut', 'observations', 'created_by',
+    ];
+
+    protected $casts = [
+        'modes_passation' => 'array',
+        'duree_min' => 'integer',
+        'duree_max' => 'integer',
     ];
 
     protected static function boot(): void

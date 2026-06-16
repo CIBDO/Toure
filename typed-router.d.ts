@@ -66,6 +66,7 @@ declare module 'vue-router/auto-routes' {
     'apps-referentiels-banques': RouteRecordInfo<'apps-referentiels-banques', '/apps/referentiels/banques', Record<never, never>, Record<never, never>>,
     'apps-referentiels-comptes-budget': RouteRecordInfo<'apps-referentiels-comptes-budget', '/apps/referentiels/comptes-budget', Record<never, never>, Record<never, never>>,
     'apps-referentiels-domaines': RouteRecordInfo<'apps-referentiels-domaines', '/apps/referentiels/domaines', Record<never, never>, Record<never, never>>,
+    'apps-referentiels-expressions-besoin': RouteRecordInfo<'apps-referentiels-expressions-besoin', '/apps/referentiels/expressions-besoin', Record<never, never>, Record<never, never>>,
     'apps-referentiels-fournisseurs': RouteRecordInfo<'apps-referentiels-fournisseurs', '/apps/referentiels/fournisseurs', Record<never, never>, Record<never, never>>,
     'apps-roles': RouteRecordInfo<'apps-roles', '/apps/roles', Record<never, never>, Record<never, never>>,
     'apps-user-list': RouteRecordInfo<'apps-user-list', '/apps/user/list', Record<never, never>, Record<never, never>>,

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BanqueController;
+use App\Http\Controllers\Api\ExpressionBesoinController;
 use App\Http\Controllers\Api\DomaineActiviteController;
 use App\Http\Controllers\Api\CompteBudgetController;
 use App\Http\Controllers\Api\FournisseurController;
@@ -70,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Référentiels
     Route::apiResource('banques', BanqueController::class);
     Route::apiResource('domaines', DomaineActiviteController::class);
+    Route::apiResource('expressions-besoin', ExpressionBesoinController::class);
     Route::apiResource('comptes-budget', CompteBudgetController::class);
 
     // Fournisseurs

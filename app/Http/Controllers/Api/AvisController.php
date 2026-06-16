@@ -7,6 +7,7 @@ use App\Http\Requests\AvisRequest;
 use App\Models\AuditLog;
 use App\Models\Avis;
 use App\Models\AvisItem;
+use App\Models\ExpressionBesoin;
 use App\Notifications\AvisPublieNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class AvisController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Avis::with(['createdBy', 'fournisseurs', 'items']);
+        $query = Avis::with(['createdBy', 'fournisseurs', 'items.expressionBesoin']);
 
         if ($request->filled('q')) {
             $q = $request->q;
@@ -86,17 +87,22 @@ class AvisController extends Controller
         }
 
         foreach ($items as $index => $item) {
-            AvisItem::create(array_merge($item, ['avis_id' => $avis->id, 'ordre' => $index + 1]));
+            AvisItem::create(array_merge(
+                $this->normalizeAvisItem($item),
+                ['avis_id' => $avis->id, 'ordre' => $index + 1]
+            ));
         }
 
         AuditLog::logAction('create', 'avis', $avis->id, null, $avis->toArray());
 
-        return response()->json($avis->load(['fournisseurs', 'items']), 201);
+        return response()->json($avis->load(['fournisseurs', 'items.expressionBesoin']), 201);
     }
 
     public function show(Avis $avi): JsonResponse
     {
-        return response()->json($avi->load(['fournisseurs', 'items', 'depouillements', 'pvs', 'createdBy', 'piecesJointes']));
+        return response()->json($avi->load([
+            'fournisseurs', 'items.expressionBesoin', 'depouillements', 'pvs', 'createdBy', 'piecesJointes',
+        ]));
     }
 
     public function update(AvisRequest $request, Avis $avi): JsonResponse
@@ -117,13 +123,16 @@ class AvisController extends Controller
         if ($items !== null) {
             $avi->items()->delete();
             foreach ($items as $index => $item) {
-                AvisItem::create(array_merge($item, ['avis_id' => $avi->id, 'ordre' => $index + 1]));
+                AvisItem::create(array_merge(
+                    $this->normalizeAvisItem($item),
+                    ['avis_id' => $avi->id, 'ordre' => $index + 1]
+                ));
             }
         }
 
         AuditLog::logAction('update', 'avis', $avi->id, $old, $avi->fresh()->toArray());
 
-        return response()->json($avi->fresh()->load(['fournisseurs', 'items']));
+        return response()->json($avi->fresh()->load(['fournisseurs', 'items.expressionBesoin']));
     }
 
     public function destroy(Avis $avi): JsonResponse
@@ -200,5 +209,23 @@ class AvisController extends Controller
         }
 
         return $data;
+    }
+
+    private function normalizeAvisItem(array $item): array
+    {
+        if (!empty($item['expression_besoin_id'])) {
+            $expression = ExpressionBesoin::find($item['expression_besoin_id']);
+            if ($expression) {
+                $item['designation'] = $item['designation'] ?? $expression->libelle;
+                if (empty($item['description_detaillee']) && $expression->description) {
+                    $item['description_detaillee'] = $expression->description;
+                }
+                if (empty($item['unite']) && $expression->unite_defaut) {
+                    $item['unite'] = $expression->unite_defaut;
+                }
+            }
+        }
+
+        return $item;
     }
 }

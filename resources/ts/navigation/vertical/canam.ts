@@ -270,6 +270,13 @@ const canamnNavItems: VerticalNavItems = [
         subject: 'Reference',
       },
       {
+        title: 'Expressions de besoin',
+        icon: { icon: 'tabler-list-check' },
+        to: 'apps-referentiels-expressions-besoin',
+        action: 'manage',
+        subject: 'Reference',
+      },
+      {
         title: 'Comptes budget',
         icon: { icon: 'tabler-wallet' },
         to: 'apps-referentiels-comptes-budget',

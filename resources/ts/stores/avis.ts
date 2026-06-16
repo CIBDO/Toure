@@ -4,6 +4,7 @@ import { useApi } from '@/composables/useApi'
 export interface AvisItem {
   id?: number
   ordre: number
+  expression_besoin_id?: number
   designation: string
   description_detaillee?: string
   quantite: number

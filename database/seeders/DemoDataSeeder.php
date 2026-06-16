@@ -8,6 +8,7 @@ use App\Models\CompteBudget;
 use App\Models\Contrat;
 use App\Models\ContratEtape;
 use App\Models\Depouillement;
+use App\Models\ExpressionBesoin;
 use App\Models\Fournisseur;
 use App\Models\Pv;
 use App\Models\User;
@@ -48,9 +49,9 @@ class DemoDataSeeder extends Seeder
         );
 
         if ($avis1->wasRecentlyCreated) {
-            AvisItem::create(['avis_id' => $avis1->id, 'ordre' => 1, 'designation' => 'Réhabilitation façade principale', 'quantite' => 1, 'unite' => 'forfait']);
-            AvisItem::create(['avis_id' => $avis1->id, 'ordre' => 2, 'designation' => 'Réfection des bureaux (5 niveaux)', 'quantite' => 5, 'unite' => 'niveau']);
-            AvisItem::create(['avis_id' => $avis1->id, 'ordre' => 3, 'designation' => 'Installation électrique et climatisation', 'quantite' => 1, 'unite' => 'forfait']);
+            $this->createAvisItem($avis1->id, 1, 'EB-001', ['quantite' => 1, 'unite' => 'forfait']);
+            $this->createAvisItem($avis1->id, 2, 'EB-002', ['quantite' => 5, 'unite' => 'niveau']);
+            $this->createAvisItem($avis1->id, 3, 'EB-003', ['quantite' => 1, 'unite' => 'forfait']);
 
             $avis1->fournisseurs()->sync($fournisseurs->take(3)->pluck('id')->toArray());
         }
@@ -73,9 +74,9 @@ class DemoDataSeeder extends Seeder
         );
 
         if ($avis2->wasRecentlyCreated) {
-            AvisItem::create(['avis_id' => $avis2->id, 'ordre' => 1, 'designation' => 'Ordinateurs portables HP EliteBook', 'quantite' => 20, 'unite' => 'unité']);
-            AvisItem::create(['avis_id' => $avis2->id, 'ordre' => 2, 'designation' => 'Imprimantes multifonctions', 'quantite' => 5, 'unite' => 'unité']);
-            AvisItem::create(['avis_id' => $avis2->id, 'ordre' => 3, 'designation' => 'Serveur NAS pour sauvegarde', 'quantite' => 1, 'unite' => 'unité']);
+            $this->createAvisItem($avis2->id, 1, 'EB-004', ['quantite' => 20, 'unite' => 'unité']);
+            $this->createAvisItem($avis2->id, 2, 'EB-005', ['quantite' => 5, 'unite' => 'unité']);
+            $this->createAvisItem($avis2->id, 3, 'EB-006', ['quantite' => 1, 'unite' => 'unité']);
 
             $avis2->fournisseurs()->sync($fournisseurs->where('domaine_activite_id', $fournisseurs->firstWhere('code', 'F-003')?->domaine_activite_id)->pluck('id')->toArray());
         }
@@ -200,5 +201,18 @@ class DemoDataSeeder extends Seeder
         }
 
         $this->command->info('Données de démonstration créées avec succès !');
+    }
+
+    private function createAvisItem(int $avisId, int $ordre, string $expressionCode, array $attributes = []): void
+    {
+        $expression = ExpressionBesoin::where('code', $expressionCode)->first();
+
+        AvisItem::create(array_merge([
+            'avis_id'              => $avisId,
+            'ordre'                => $ordre,
+            'expression_besoin_id' => $expression?->id,
+            'designation'          => $expression?->libelle ?? $expressionCode,
+            'quantite'             => 1,
+        ], $attributes));
     }
 }

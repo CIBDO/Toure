@@ -34,6 +34,10 @@ class FournisseurRequest extends FormRequest
             'representant'            => ['nullable', 'string', 'max:255'],
             'fonction_representant'   => ['nullable', 'string', 'max:255'],
             'domaine_activite_id'     => ['nullable', 'exists:domaines_activite,id'],
+            'modes_passation'         => ['required', 'array', 'min:1'],
+            'modes_passation.*'       => [Rule::in(['AO_OUVERT', 'AO_RESTREINT', 'CONSULTATION', 'GRE_A_GRE', 'ENTENTE_DIRECTE'])],
+            'duree_min'               => ['nullable', 'integer', 'min:1'],
+            'duree_max'               => ['nullable', 'integer', 'min:1'],
             'statut'                  => ['nullable', Rule::in(['actif', 'suspendu', 'blackliste'])],
             'observations'            => ['nullable', 'string'],
             'banques'                 => ['nullable', 'array'],
@@ -45,5 +49,19 @@ class FournisseurRequest extends FormRequest
             'banques.*.intitule_compte' => ['nullable', 'string', 'max:255'],
             'banques.*.principal'     => ['boolean'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $min = $this->input('duree_min');
+            $max = $this->input('duree_max');
+            if ($min !== null && $max !== null && (int) $max < (int) $min) {
+                $validator->errors()->add(
+                    'duree_max',
+                    'La durée maximale doit être supérieure ou égale à la durée minimale.'
+                );
+            }
+        });
     }
 }

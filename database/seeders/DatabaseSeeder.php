@@ -26,8 +26,9 @@ class DatabaseSeeder extends Seeder
             AssignRolesToFirstUsersSeeder::class, // 4. Rôle ADMIN_CANAM pour les premiers utilisateurs (id 1, 2, 3)
             BanqueSeeder::class,          // 5. Banques
             DomaineActiviteSeeder::class, // 6. Domaines d'activité
-            CompteBudgetSeeder::class,    // 7. Comptes budget
-            FournisseurSeeder::class,     // 8. Fournisseurs
+            ExpressionBesoinSeeder::class,  // 7. Expressions de besoin
+            CompteBudgetSeeder::class,    // 8. Comptes budget
+            FournisseurSeeder::class,     // 9. Fournisseurs
         ];
 
         // Données de démo : uniquement si APP_SEED_DEMO=true (dev/staging)

@@ -37,6 +37,26 @@ class FournisseurController extends Controller
             $query->where('domaine_activite_id', $request->domaine_activite_id);
         }
 
+        if ($request->filled('mode_passation')) {
+            $mode = $request->mode_passation;
+            $query->where(function ($query) use ($mode) {
+                $query->whereJsonContains('modes_passation', $mode)
+                    ->orWhereNull('modes_passation')
+                    ->orWhere('modes_passation', '[]');
+            });
+        }
+
+        if ($request->filled('duree')) {
+            $duree = (int) $request->duree;
+            $query->where(function ($query) use ($duree) {
+                $query->where(function ($query) use ($duree) {
+                    $query->whereNull('duree_min')->orWhere('duree_min', '<=', $duree);
+                })->where(function ($query) use ($duree) {
+                    $query->whereNull('duree_max')->orWhere('duree_max', '>=', $duree);
+                });
+            });
+        }
+
         $sortBy = $request->get('sortBy', 'raison_sociale');
         $sortOrder = $request->get('sortDesc', false) ? 'desc' : 'asc';
         $query->orderBy($sortBy, $sortOrder);

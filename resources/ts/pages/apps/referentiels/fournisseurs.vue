@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { MODE_PASSATION_OPTIONS, modePassationLabel } from '@/constants/modesPassation'
 import { useFournisseursStore } from '@/stores/fournisseurs'
+import type { Fournisseur } from '@/stores/fournisseurs'
 import { useDomainesStore } from '@/stores/domaines'
 import { useBanquesStore } from '@/stores/banques'
 
@@ -21,6 +23,18 @@ const itemsPerPage = ref(10)
 const page = ref(1)
 const sortBy = ref([{ key: 'raison_sociale', order: 'asc' }])
 const activeTab = ref('info')
+const formRef = ref<any>(null)
+
+const modeOptions = MODE_PASSATION_OPTIONS
+
+const modesRule = (v: string[]) => (Array.isArray(v) && v.length > 0) || 'Sélectionnez au moins un mode de passation'
+const dureeRangeRule = () => {
+  const min = form.value.duree_min
+  const max = form.value.duree_max
+  if (min != null && max != null && max < min)
+    return 'La durée max. doit être supérieure ou égale à la durée min.'
+  return true
+}
 
 const civiliteOptions = [
   { title: 'M.', value: 'M.' },
@@ -61,6 +75,9 @@ const emptyForm = () => ({
   representant: '',
   fonction_representant: '',
   domaine_activite_id: null as number | null,
+  modes_passation: ['AO_OUVERT'] as string[],
+  duree_min: null as number | null,
+  duree_max: null as number | null,
   statut: 'actif',
   observations: '',
   banques: [] as any[],
@@ -74,6 +91,7 @@ const headers = [
   { title: 'NIF', key: 'nif', sortable: false },
   { title: 'RC', key: 'rc', sortable: false },
   { title: 'Domaine', key: 'domaine_activite', sortable: false },
+  { title: 'Modes passation', key: 'modes_passation', sortable: false },
   { title: 'Téléphone', key: 'telephone', sortable: false },
   { title: 'Ville', key: 'ville', sortable: true },
   { title: 'Statut', key: 'statut', sortable: true },
@@ -125,6 +143,7 @@ const openEdit = async (item: any) => {
   form.value = {
     ...emptyForm(),
     ...full,
+    modes_passation: full.modes_passation?.length ? full.modes_passation : ['AO_OUVERT'],
     banques: full.banques?.map((b: any) => ({
       banque_id: b.banque_id,
       numero_compte: b.numero_compte,
@@ -155,6 +174,13 @@ const removeBanque = (index: number) => {
 }
 
 const save = async () => {
+  const { valid } = await formRef.value?.validate()
+  if (!valid) {
+    activeTab.value = 'info'
+    snackbar.value = { show: true, text: 'Veuillez corriger les champs obligatoires', color: 'error' }
+    return
+  }
+
   try {
     if (isEditing.value)
       await store.updateFournisseur(selectedItem.value.id, form.value)
@@ -243,6 +269,20 @@ const confirmDelete = async () => {
             <template #item.domaine_activite="{ item }">
               <span class="text-caption">{{ item.domaine_activite?.libelle ?? '-' }}</span>
             </template>
+            <template #item.modes_passation="{ item }">
+              <div class="d-flex flex-wrap gap-1 py-1">
+                <VChip
+                  v-for="mode in (item.modes_passation ?? [])"
+                  :key="mode"
+                  size="x-small"
+                  variant="tonal"
+                  color="info"
+                >
+                  {{ modePassationLabel(mode) }}
+                </VChip>
+                <span v-if="!item.modes_passation?.length" class="text-caption">-</span>
+              </div>
+            </template>
             <template #item.statut="{ item }">
               <VChip :color="statutColor(item.statut)" size="small" class="text-capitalize">
                 {{ item.statut }}
@@ -289,6 +329,7 @@ const confirmDelete = async () => {
         <VDivider />
 
         <div class="pa-4">
+          <VForm ref="formRef">
           <VTabsWindow v-model="activeTab">
 
             <!-- ── Onglet Informations générales ── -->
@@ -348,6 +389,41 @@ const confirmDelete = async () => {
                     v-model="form.statut"
                     :items="statutOptions"
                     label="Statut"
+                  />
+                </VCol>
+                <VCol cols="12">
+                  <VSelect
+                    v-model="form.modes_passation"
+                    :items="modeOptions"
+                    label="Modes de passation autorisés *"
+                    multiple
+                    chips
+                    closable-chips
+                    :rules="[modesRule]"
+                    hint="Modes pour lesquels ce fournisseur peut être invité à un avis"
+                    persistent-hint
+                  />
+                </VCol>
+                <VCol cols="12" md="6">
+                  <VTextField
+                    v-model.number="form.duree_min"
+                    label="Durée consultation min. (jours)"
+                    type="number"
+                    min="1"
+                    hint="Durée minimale d'avis acceptée (optionnel)"
+                    persistent-hint
+                    :rules="[dureeRangeRule]"
+                  />
+                </VCol>
+                <VCol cols="12" md="6">
+                  <VTextField
+                    v-model.number="form.duree_max"
+                    label="Durée consultation max. (jours)"
+                    type="number"
+                    min="1"
+                    hint="Durée maximale d'avis acceptée (optionnel)"
+                    persistent-hint
+                    :rules="[dureeRangeRule]"
                   />
                 </VCol>
                 <VCol cols="12">
@@ -466,6 +542,7 @@ const confirmDelete = async () => {
             </VTabsWindowItem>
 
           </VTabsWindow>
+          </VForm>
         </div>
       </VCardText>
 
