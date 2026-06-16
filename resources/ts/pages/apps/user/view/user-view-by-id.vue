@@ -1,0 +1,83 @@
+<script setup lang="ts">
+definePage({ meta: { title: 'Détail utilisateur', action: 'view', subject: 'User' } })
+
+import UserBioPanel from '@/views/apps/user/view/UserBioPanel.vue'
+import UserTabAccount from '@/views/apps/user/view/UserTabAccount.vue'
+import UserTabSecurity from '@/views/apps/user/view/UserTabSecurity.vue'
+import UserTabRolesPermissions from '@/views/apps/user/view/UserTabRolesPermissions.vue'
+
+const route = useRoute('apps-user-view-id')
+
+const userTab = ref(null)
+
+const tabs = [
+  { icon: 'tabler-users', title: 'Compte' },
+  { icon: 'tabler-shield', title: 'Rôles & Permissions' },
+  { icon: 'tabler-lock', title: 'Sécurité' },
+]
+
+// Charger les données utilisateur depuis l'API Laravel IAM
+const { data: userDataResponse, error } = await useApi<any>(`/users/${route.params.id}`)
+const userData = computed(() => userDataResponse.value)
+</script>
+
+<template>
+  <VRow v-if="userData">
+    <VCol
+      cols="12"
+      md="5"
+      lg="4"
+    >
+      <UserBioPanel :user-data="userData" />
+    </VCol>
+
+    <VCol
+      cols="12"
+      md="7"
+      lg="8"
+    >
+      <VTabs
+        v-model="userTab"
+        class="v-tabs-pill"
+      >
+        <VTab
+          v-for="tab in tabs"
+          :key="tab.icon"
+        >
+          <VIcon
+            :size="18"
+            :icon="tab.icon"
+            class="me-1"
+          />
+          <span>{{ tab.title }}</span>
+        </VTab>
+      </VTabs>
+
+      <VWindow
+        v-model="userTab"
+        class="mt-6 disable-tab-transition"
+        :touch="false"
+      >
+        <VWindowItem>
+          <UserTabAccount :user-data="userData" />
+        </VWindowItem>
+
+        <VWindowItem>
+          <UserTabRolesPermissions :user-data="userData" />
+        </VWindowItem>
+
+        <VWindowItem>
+          <UserTabSecurity :user-data="userData" />
+        </VWindowItem>
+      </VWindow>
+    </VCol>
+  </VRow>
+  <div v-else>
+    <VAlert
+      type="error"
+      variant="tonal"
+    >
+      Utilisateur avec l'ID {{ route.params.id }} non trouvé !
+    </VAlert>
+  </div>
+</template>
