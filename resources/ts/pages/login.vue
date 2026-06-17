@@ -1,8 +1,8 @@
 <!-- Page de connexion - Plateforme CANAM -->
 <script setup lang="ts">
-import { VForm } from 'vuetify/components/VForm'
-import { emailValidator, requiredValidator } from '@validators'
 import { useAuthStore } from '@/stores/auth'
+import { emailValidator, requiredValidator } from '@validators'
+import { VForm } from 'vuetify/components/VForm'
 
 definePage({
   meta: {
@@ -106,6 +106,13 @@ onMounted(() => {
 
 <template>
   <div class="login-page">
+    <div class="page-grid" />
+    <div class="page-glow glow-left" />
+    <div class="page-glow glow-right" />
+    <div class="floating-orb orb-1" />
+    <div class="floating-orb orb-2" />
+    <div class="floating-orb orb-3" />
+
     <!-- Écran de transition après connexion -->
     <Transition name="fade">
       <div
@@ -130,6 +137,7 @@ onMounted(() => {
       class="login-card"
       :class="{ 'card-hidden': isRedirecting }"
     >
+      <div class="card-accent" />
       <!-- Blob décoratif haut-gauche (bleu CANAM) -->
       <div class="blob blob-top-left" />
       <!-- Blob décoratif bas-droite (or CANAM) -->
@@ -147,9 +155,6 @@ onMounted(() => {
       <h1 class="login-title">
         Connexion
       </h1>
-      <!-- <p class="login-subtitle">
-        Plateforme de Gestion des Contrats
-      </p> -->
 
       <!-- Alertes -->
       <div style="position: relative; z-index: 4;">
@@ -261,7 +266,7 @@ onMounted(() => {
       </VForm>
 
       <!-- Footer -->
-      
+      <div class="login-divider" />
       <p class="login-footer">
        CAISSE NATIONALE D'ASSURANCE MALADIE
       </p>
@@ -289,8 +294,87 @@ $canam-border: rgba(26, 95, 168, 0.18);
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f0f4f8;
+  padding: 2rem 1rem;
+  background:
+    radial-gradient(circle at top left, rgba(26, 95, 168, 0.16), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(235, 195, 51, 0.18), transparent 30%),
+    linear-gradient(135deg, #eef4fb 0%, #f8fbff 48%, #f3f7fb 100%);
   overflow: hidden;
+}
+
+.page-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(26, 95, 168, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(26, 95, 168, 0.05) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.75), transparent 92%);
+  pointer-events: none;
+}
+
+.page-glow,
+.floating-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.page-glow {
+  filter: blur(18px);
+  opacity: 0.65;
+}
+
+.glow-left {
+  width: 320px;
+  height: 320px;
+  top: 8%;
+  left: 8%;
+  background: rgba($canam-blue, 0.16);
+}
+
+.glow-right {
+  width: 280px;
+  height: 280px;
+  right: 10%;
+  bottom: 10%;
+  background: rgba($canam-gold, 0.22);
+}
+
+.floating-orb {
+  z-index: 1;
+  animation: floatDrift 12s ease-in-out infinite;
+}
+
+.orb-1 {
+  width: 18px;
+  height: 18px;
+  top: 16%;
+  right: 18%;
+  background: linear-gradient(135deg, rgba($canam-blue, 0.95), rgba($canam-green, 0.95));
+}
+
+.orb-2 {
+  width: 12px;
+  height: 12px;
+  bottom: 18%;
+  left: 16%;
+  background: linear-gradient(135deg, rgba($canam-gold, 0.95), rgba($canam-red, 0.95));
+  animation-delay: 1.5s;
+}
+
+.orb-3 {
+  width: 22px;
+  height: 22px;
+  top: 42%;
+  left: 12%;
+  background: linear-gradient(135deg, rgba($canam-blue, 0.78), rgba($canam-gold, 0.9));
+  animation-delay: 3s;
+}
+
+@keyframes floatDrift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -12px, 0); }
 }
 
 // ── Blobs décoratifs ────────────────────────────────────────────
@@ -334,11 +418,27 @@ $canam-border: rgba(26, 95, 168, 0.18);
   max-width: 420px;
   margin: 1.5rem;
   padding: 2.5rem 2rem 1.75rem;
-  background: $canam-card;
-  border: 1px solid $canam-border;
-  border-radius: 16px;
-  box-shadow: 0 8px 40px rgba(26, 95, 168, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 24px;
+  box-shadow: 0 22px 60px rgba(26, 95, 168, 0.16), 0 10px 20px rgba(13, 27, 42, 0.08);
+  backdrop-filter: blur(16px);
   overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.login-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 28px 72px rgba(26, 95, 168, 0.18), 0 12px 26px rgba(13, 27, 42, 0.08);
+}
+
+.card-accent {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 5px;
+  background: linear-gradient(90deg, $canam-blue 0%, $canam-green 45%, $canam-gold 100%);
+  z-index: 5;
 }
 
 // ── Logo ────────────────────────────────────────────────────────
@@ -355,28 +455,22 @@ $canam-border: rgba(26, 95, 168, 0.18);
   height: 90px;
   object-fit: contain;
   border-radius: 50%;
-  box-shadow: 0 4px 16px rgba($canam-blue, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 28px rgba($canam-blue, 0.22);
+  padding: 0.4rem;
 }
 
 // ── Titre ───────────────────────────────────────────────────────
 .login-title {
   font-size: 1.75rem;
   font-weight: 700;
-  color: $canam-dark;
+  background: linear-gradient(135deg, $canam-dark 0%, $canam-blue 75%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   text-align: center;
   margin-bottom: 0.25rem;
   letter-spacing: 0.01em;
-  position: relative;
-  z-index: 4;
-}
-
-.login-subtitle {
-  font-size: 0.8rem;
-  color: rgba($canam-dark, 0.45);
-  text-align: center;
-  margin-bottom: 1.75rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   position: relative;
   z-index: 4;
 }
@@ -394,7 +488,7 @@ $canam-border: rgba(26, 95, 168, 0.18);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
 }
 
 .field-label {
@@ -407,26 +501,32 @@ $canam-border: rgba(26, 95, 168, 0.18);
 // Surcharge des champs pour le thème clair
 .login-field {
   :deep(.v-field) {
-    background: #f7f9fc !important;
-    border-radius: 8px;
+    background: rgba(247, 249, 252, 0.92) !important;
+    border-radius: 12px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 
+    .v-field__overlay,
     .v-field__outline__start,
     .v-field__outline__end,
     .v-field__outline__notch {
-      border-color: rgba($canam-blue, 0.2) !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
     }
 
+    &:hover .v-field__overlay,
     &:hover .v-field__outline__start,
     &:hover .v-field__outline__end,
     &:hover .v-field__outline__notch {
-      border-color: rgba($canam-blue, 0.5) !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
     }
 
+    &.v-field--focused .v-field__overlay,
     &.v-field--focused .v-field__outline__start,
     &.v-field--focused .v-field__outline__end,
     &.v-field--focused .v-field__outline__notch {
-      border-color: $canam-blue !important;
-      border-width: 2px !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
     }
   }
 
@@ -434,6 +534,13 @@ $canam-border: rgba(26, 95, 168, 0.18);
   :deep(.v-field__input) {
     color: $canam-dark !important;
     font-size: 0.9rem;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: transparent !important;
 
     &::placeholder {
       color: rgba($canam-dark, 0.3) !important;
@@ -450,6 +557,9 @@ $canam-border: rgba(26, 95, 168, 0.18);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.1rem;
+  padding-top: 0.35rem;
   margin-bottom: 0.5rem;
   position: relative;
   z-index: 4;
@@ -476,22 +586,36 @@ $canam-border: rgba(26, 95, 168, 0.18);
 
 // ── Bouton principal ─────────────────────────────────────────────
 .login-btn {
-  background: $canam-blue !important;
+  background: linear-gradient(135deg, $canam-blue 0%, darken($canam-blue, 10%) 100%) !important;
   color: #fff !important;
   font-weight: 700 !important;
   font-size: 0.95rem !important;
   letter-spacing: 0.03em !important;
   text-transform: none !important;
-  border-radius: 8px !important;
-  height: 48px !important;
-  box-shadow: 0 4px 16px rgba($canam-blue, 0.35) !important;
+  border-radius: 12px !important;
+  height: 50px !important;
+  box-shadow: 0 10px 24px rgba($canam-blue, 0.32) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
   position: relative;
   z-index: 4;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 20%, rgba(255, 255, 255, 0.24) 50%, transparent 80%);
+    transform: translateX(-120%);
+    transition: transform 0.45s ease;
+  }
 
   &:not(:disabled):hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba($canam-blue, 0.45) !important;
+    box-shadow: 0 14px 28px rgba($canam-blue, 0.4) !important;
+
+    &::before {
+      transform: translateX(120%);
+    }
   }
 
   &:not(:disabled):active {
@@ -505,8 +629,15 @@ $canam-border: rgba(26, 95, 168, 0.18);
 }
 
 // ── Footer ───────────────────────────────────────────────────────
+.login-divider {
+  width: 100%;
+  height: 1px;
+  margin-top: 1.35rem;
+  background: linear-gradient(90deg, transparent 0%, rgba($canam-blue, 0.18) 50%, transparent 100%);
+}
+
 .login-footer {
-  margin-top: 1.5rem;
+  margin-top: 1rem;
   font-size: 0.7rem;
   color: rgba($canam-dark, 0.35);
   text-align: center;
@@ -599,7 +730,7 @@ $canam-border: rgba(26, 95, 168, 0.18);
   .login-card {
     padding: 2rem 1.25rem 1.5rem;
     margin: 1rem;
-    border-radius: 12px;
+    border-radius: 20px;
   }
 
   .login-logo {
@@ -609,6 +740,11 @@ $canam-border: rgba(26, 95, 168, 0.18);
 
   .login-title {
     font-size: 1.5rem;
+  }
+
+  .login-options {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .blob-top-left {
@@ -623,6 +759,12 @@ $canam-border: rgba(26, 95, 168, 0.18);
     height: 130px;
     bottom: -45px;
     right: -45px;
+  }
+
+  .glow-left,
+  .glow-right {
+    width: 180px;
+    height: 180px;
   }
 }
 </style>
