@@ -28,7 +28,7 @@ export interface Reception {
   constatations?: string
   reserves?: string
   statut_conformite: StatutConformite
-  montant_receptionne?: number
+  quantite_receptionnee?: number
   taux_execution?: number
   statut: StatutReception
   commentaire_validation?: string

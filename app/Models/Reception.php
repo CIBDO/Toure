@@ -27,14 +27,14 @@ class Reception extends Model
     protected $fillable = [
         'uuid', 'contrat_id', 'numero', 'type_reception', 'date_reception',
         'lieu_reception', 'responsable_reception', 'constatations', 'reserves',
-        'statut_conformite', 'montant_receptionne', 'taux_execution',
+        'statut_conformite', 'quantite_receptionnee', 'taux_execution',
         'statut', 'commentaire_validation', 'approved_by', 'approved_at', 'created_by',
     ];
 
     protected $casts = [
         'date_reception' => 'date',
         'approved_at' => 'datetime',
-        'montant_receptionne' => 'integer',
+        'quantite_receptionnee' => 'decimal:2',
         'taux_execution' => 'decimal:2',
     ];
 

@@ -11,8 +11,10 @@ const uploadDialog = ref(false)
 const isEditing = ref(false)
 const selectedItem = ref<any>(null)
 const motifRejet = ref('')
-const uploadFile = ref<File | null>(null)
+const uploadFiles = ref<File[]>([])
 const isUploading = ref(false)
+
+const selectedUploadFile = computed(() => uploadFiles.value?.[0] ?? null)
 
 // Filtres
 const searchQuery = ref('')
@@ -167,7 +169,7 @@ const openReject = (item: any) => {
 
 const openUpload = (item: any) => {
   selectedItem.value = item
-  uploadFile.value = null
+  uploadFiles.value = []
   uploadDialog.value = true
 }
 
@@ -226,30 +228,60 @@ const downloadPdf = (item: any) => {
   window.open(`${import.meta.env.VITE_API_BASE_URL}/pvs/${item.id}/pdf`, '_blank')
 }
 
-const downloadSigne = (item: any) => {
-  window.open(`${import.meta.env.VITE_API_BASE_URL}/pvs/${item.id}/download-signe`, '_blank')
+const downloadSigne = async (item: any) => {
+  try {
+    const baseUrl = (import.meta.env.VITE_API_BASE_URL && String(import.meta.env.VITE_API_BASE_URL)) || '/api'
+    const token = useCookie('accessToken').value
+    const response = await fetch(`${baseUrl}/pvs/${item.id}/download-signe`, {
+      headers: {
+        Accept: 'application/pdf',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+    if (!response.ok) throw new Error('Fichier introuvable')
+    const blob = await response.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `pv_signe_${item.reference || item.id}.pdf`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+  catch {
+    snackbar.value = { show: true, text: 'Téléchargement impossible', color: 'error' }
+  }
 }
 
 const submitUpload = async () => {
-  if (!uploadFile.value) return
+  const file = selectedUploadFile.value
+  if (!file) return
   isUploading.value = true
   try {
     const formData = new FormData()
-    formData.append('fichier', uploadFile.value)
+    formData.append('fichier', file)
 
-    await $fetch(`${import.meta.env.VITE_API_BASE_URL}/pvs/${selectedItem.value.id}/upload-signe`, {
+    const baseUrl = (import.meta.env.VITE_API_BASE_URL && String(import.meta.env.VITE_API_BASE_URL)) || '/api'
+    const token = useCookie('accessToken').value
+    const response = await fetch(`${baseUrl}/pvs/${selectedItem.value.id}/upload-signe`, {
       method: 'POST',
-      body: formData,
       headers: {
-        Authorization: `Bearer ${useCookie('accessToken').value}`,
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      body: formData,
     })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      const message = err?.errors?.fichier?.[0] || err?.message || 'Erreur lors de l\'upload'
+      throw new Error(message)
+    }
+
     uploadDialog.value = false
     snackbar.value = { show: true, text: 'PV signé uploadé avec succès', color: 'success' }
     await loadData()
   }
-  catch {
-    snackbar.value = { show: true, text: 'Erreur lors de l\'upload', color: 'error' }
+  catch (e: any) {
+    snackbar.value = { show: true, text: e?.message || 'Erreur lors de l\'upload', color: 'error' }
   }
   finally {
     isUploading.value = false
@@ -523,11 +555,12 @@ const openDetails = async (item: any) => {
           <span class="text-caption text-medium-emphasis">Format accepté : PDF uniquement, max 10 Mo</span>
         </p>
         <VFileInput
-          v-model="uploadFile"
+          v-model="uploadFiles"
           label="Sélectionner le fichier PDF signé"
-          accept=".pdf"
+          accept="application/pdf,.pdf"
           prepend-icon="tabler-file-type-pdf"
           show-size
+          clearable
         />
         <VAlert v-if="selectedItem?.fichier_pv_signe" type="warning" variant="tonal" density="compact" class="mt-2">
           Un PV signé existe déjà. Il sera remplacé.
@@ -539,7 +572,7 @@ const openDetails = async (item: any) => {
           color="teal"
           prepend-icon="tabler-upload"
           :loading="isUploading"
-          :disabled="!uploadFile"
+          :disabled="!selectedUploadFile"
           @click="submitUpload"
         >
           Uploader

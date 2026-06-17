@@ -58,8 +58,9 @@ const headers = [
   { title: 'Montant', key: 'montant_initial', sortable: true },
   { title: 'Exercice', key: 'exercice', sortable: true },
   { title: 'Date signature', key: 'date_signature', sortable: true },
+  { title: 'Date prév. réception', key: 'date_previsionnelle_reception', sortable: true },
   { title: 'Statut', key: 'statut', sortable: true },
-  { title: 'Actions', key: 'actions', sortable: false, width: '180px' },
+  { title: 'Actions', key: 'actions', sortable: false, width: '220px' },
 ]
 
 const emptyForm = () => ({
@@ -70,7 +71,7 @@ const emptyForm = () => ({
   compte_budget_id: null as number | null,
   agent_id: null as number | null,
   montant_initial: 0, devise: 'CFA',
-  date_signature: '', date_debut: '', date_fin: '',
+  date_signature: '', date_debut: '', date_fin: '', date_previsionnelle_reception: '',
   duree_execution: null as number | null,
   mode_passation: '', exercice: new Date().getFullYear().toString(),
   statut: 'draft', observations: '',
@@ -136,11 +137,18 @@ const openEdit = async (item: any) => {
   isEditing.value = true
   selectedItem.value = item
   const full = await store.fetchContrat(item.id)
-  form.value = { ...emptyForm(), ...full }
+  form.value = {
+    ...emptyForm(),
+    ...full,
+    date_signature: normalizeDateField(full.date_signature),
+    date_debut: normalizeDateField(full.date_debut),
+    date_fin: normalizeDateField(full.date_fin),
+    date_previsionnelle_reception: normalizeDateField(full.date_previsionnelle_reception),
+  }
   dialog.value = true
 }
 
-const viewContrat = (item: any) => router.push(`/apps/contrats/${item.id}`)
+const viewContrat = (item: any) => router.push({ name: 'apps-contrats-id', params: { id: item.id } })
 
 const openDelete = (item: any) => {
   selectedItem.value = item
@@ -204,7 +212,18 @@ const confirmReject = async () => {
   }
 }
 
-  const formatMontant = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(v)
+const formatMontant = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(v)
+
+const formatDate = (d?: string | null) => {
+  if (!d) return '-'
+  const normalized = d.slice(0, 10)
+  const [year, month, day] = normalized.split('-')
+  if (year && month && day)
+    return `${day}/${month}/${year}`
+  return new Date(d).toLocaleDateString('fr-FR')
+}
+
+const normalizeDateField = (d?: string | null) => (d ? d.slice(0, 10) : '')
 </script>
 
 <template>
@@ -304,12 +323,16 @@ const confirmReject = async () => {
               <span class="font-weight-bold text-primary">{{ formatMontant(item.montant_initial) }}</span>
             </template>
             <template #item.date_signature="{ item }">
-              <span class="text-caption">{{ item.date_signature ?? '-' }}</span>
+              <span class="text-caption text-no-wrap">{{ formatDate(item.date_signature) }}</span>
+            </template>
+            <template #item.date_previsionnelle_reception="{ item }">
+              <span class="text-caption text-no-wrap">{{ formatDate(item.date_previsionnelle_reception) }}</span>
             </template>
             <template #item.statut="{ item }">
               <VChip :color="statutColor(item.statut)" size="small">{{ statutLabel(item.statut) }}</VChip>
             </template>
             <template #item.actions="{ item }">
+              <div class="d-flex align-center justify-start flex-nowrap gap-0">
               <!-- Voir détails -->
               <VBtn icon variant="text" size="small" color="secondary" @click="viewContrat(item)">
                 <VIcon icon="tabler-eye" />
@@ -351,6 +374,7 @@ const confirmReject = async () => {
                 <VIcon icon="tabler-trash" />
                 <VTooltip activator="parent">Supprimer</VTooltip>
               </VBtn>
+              </div>
             </template>
           </VDataTableServer>
         </VCardText>
@@ -410,6 +434,9 @@ const confirmReject = async () => {
           </VCol>
           <VCol cols="12" md="6">
             <VTextField v-model="form.date_fin" label="Date de fin" type="date" />
+          </VCol>
+          <VCol cols="12" md="6">
+            <VTextField v-model="form.date_previsionnelle_reception" label="Date prévisionnelle de réception" type="date" />
           </VCol>
           <VCol cols="12">
             <VTextarea v-model="form.observations" label="Observations" rows="3" />

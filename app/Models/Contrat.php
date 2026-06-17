@@ -15,7 +15,7 @@ class Contrat extends Model
         'uuid', 'reference', 'numero', 'objet', 'pv_id', 'avis_id',
         'fournisseur_id', 'compte_budget_id', 'agent_id',
         'montant_initial', 'montant_actuel', 'devise',
-        'date_signature', 'date_debut', 'date_fin',
+        'date_signature', 'date_debut', 'date_fin', 'date_previsionnelle_reception',
         'duree_execution', 'mode_passation', 'exercice',
         'statut', 'observations', 'motif_rejet', 'status_execution', 'cloturable', 'created_by',
     ];
@@ -24,6 +24,7 @@ class Contrat extends Model
         'date_signature' => 'date',
         'date_debut' => 'date',
         'date_fin' => 'date',
+        'date_previsionnelle_reception' => 'date',
         'montant_initial' => 'decimal:2',
         'montant_actuel' => 'decimal:2',
         'cloturable' => 'boolean',

@@ -77,19 +77,20 @@ const canamnNavItems: VerticalNavItems = [
         subject: 'Contrat',
       },
       {
-        title: 'Avenants',
-        icon: { icon: 'tabler-file-plus' },
-        to: 'apps-contrats-avenants',
-        action: 'view',
-        subject: 'Contrat',
-      },
-      {
         title: 'Ordres de service',
         icon: { icon: 'tabler-clipboard-text' },
         to: 'apps-contrats-ordre-services',
         action: 'view',
         subject: 'OrdreService',
       },
+      {
+        title: 'Avenants',
+        icon: { icon: 'tabler-file-plus' },
+        to: 'apps-contrats-avenants',
+        action: 'view',
+        subject: 'Contrat',
+      },
+      
       {
         title: 'Réceptions',
         icon: { icon: 'tabler-package-import' },

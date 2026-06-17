@@ -31,7 +31,7 @@ class StoreReceptionRequest extends FormRequest
             'constatations' => ['nullable', 'string', 'max:10000'],
             'reserves' => ['nullable', 'string', 'max:10000'],
             'statut_conformite' => ['nullable', 'in:conforme,non_conforme,conforme_avec_reserves'],
-            'montant_receptionne' => ['nullable', 'integer', 'min:0'],
+            'quantite_receptionnee' => ['nullable', 'numeric', 'min:0'],
             'reception_items' => ['nullable', 'array'],
             'reception_items.*.label' => ['nullable', 'string', 'max:255'],
             'reception_items.*.quantite_prevue' => ['nullable', 'numeric', 'min:0'],

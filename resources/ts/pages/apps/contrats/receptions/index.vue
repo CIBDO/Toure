@@ -56,7 +56,8 @@ const headers = [
   { title: 'Numéro', key: 'numero', sortable: true },
   { title: 'Contrat', key: 'contrat', sortable: false },
   { title: 'Type', key: 'type_reception', sortable: true },
-  { title: 'Date', key: 'date_reception', sortable: true },
+  { title: 'Date réception', key: 'date_reception', sortable: true },
+  { title: 'Date prév. réception', key: 'date_previsionnelle_reception', sortable: false },
   { title: 'Conformité', key: 'statut_conformite', sortable: false },
   { title: 'Statut', key: 'statut', sortable: true },
   { title: 'Actions', key: 'actions', sortable: false, width: '200px' },
@@ -279,6 +280,9 @@ const confirmReject = async () => {
             <template #item.date_reception="{ item }">
               {{ formatDate(item.date_reception) }}
             </template>
+            <template #item.date_previsionnelle_reception="{ item }">
+              {{ formatDate(item.contrat?.date_previsionnelle_reception) }}
+            </template>
             <template #item.statut_conformite="{ item }">
               <VChip :color="conformiteColor(item.statut_conformite)" size="small">
                 {{ conformiteLabels[item.statut_conformite] ?? item.statut_conformite }}
@@ -347,6 +351,17 @@ const confirmReject = async () => {
           label="Contrat *"
           class="mb-4"
         />
+        <VAlert
+          v-if="contratForForm?.date_previsionnelle_reception"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          icon="tabler-calendar-event"
+        >
+          Date prévisionnelle de réception du contrat :
+          <strong>{{ formatDate(contratForForm.date_previsionnelle_reception) }}</strong>
+        </VAlert>
         <ReceptionForm
           v-if="contratForForm || selectedItem"
           :model-value="selectedItem ?? {}"

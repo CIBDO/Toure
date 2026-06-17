@@ -30,6 +30,7 @@ class ContratRequest extends FormRequest
             'date_signature'  => ['nullable', 'date'],
             'date_debut'      => ['nullable', 'date'],
             'date_fin'        => ['nullable', 'date', 'after_or_equal:date_debut'],
+            'date_previsionnelle_reception' => ['nullable', 'date'],
             'duree_execution' => ['nullable', 'integer', 'min:1'],
             'mode_passation'  => ['nullable', 'string', 'max:50'],
             'exercice'        => ['nullable', 'string', 'size:4'],

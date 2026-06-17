@@ -102,6 +102,10 @@ onMounted(() => store.fetchReception(receptionId.value))
                   <td class="text-medium-emphasis text-caption">Date de réception</td>
                   <td>{{ formatDate(reception.date_reception) }}</td>
                 </tr>
+                <tr v-if="reception.contrat?.date_previsionnelle_reception">
+                  <td class="text-medium-emphasis text-caption">Date prévisionnelle de réception</td>
+                  <td>{{ formatDate(reception.contrat.date_previsionnelle_reception) }}</td>
+                </tr>
                 <tr v-if="reception.lieu_reception">
                   <td class="text-medium-emphasis text-caption">Lieu</td>
                   <td>{{ reception.lieu_reception }}</td>
@@ -114,9 +118,9 @@ onMounted(() => store.fetchReception(receptionId.value))
                   <td class="text-medium-emphasis text-caption">Conformité</td>
                   <td>{{ conformiteLabels[reception.statut_conformite] }}</td>
                 </tr>
-                <tr v-if="reception.montant_receptionne != null">
-                  <td class="text-medium-emphasis text-caption">Montant réceptionné</td>
-                  <td>{{ formatMontant(reception.montant_receptionne) }}</td>
+                <tr v-if="reception.quantite_receptionnee != null">
+                  <td class="text-medium-emphasis text-caption">Quantité réceptionnée</td>
+                  <td>{{ reception.quantite_receptionnee }}</td>
                 </tr>
                 <tr v-if="reception.taux_execution != null">
                   <td class="text-medium-emphasis text-caption">Taux d'exécution</td>

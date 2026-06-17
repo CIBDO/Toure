@@ -4,7 +4,7 @@ import type { Reception, ReceptionItem } from '@/stores/receptions'
 const props = withDefaults(
   defineProps<{
     modelValue: Partial<Reception> & { reception_items?: ReceptionItem[] }
-    contrat?: { id: number; reference?: string }
+    contrat?: { id: number; reference?: string; date_previsionnelle_reception?: string }
     hasProvisoireApproved?: boolean
     isEditing?: boolean
   }>(),
@@ -36,7 +36,7 @@ const form = ref({
   constatations: props.modelValue?.constatations ?? '',
   reserves: props.modelValue?.reserves ?? '',
   statut_conformite: (props.modelValue?.statut_conformite as string) ?? 'conforme',
-  montant_receptionne: props.modelValue?.montant_receptionne ?? null as number | null,
+  quantite_receptionnee: props.modelValue?.quantite_receptionnee ?? null as number | null,
   reception_items: (props.modelValue?.reception_items ?? []) as ReceptionItem[],
 })
 
@@ -51,7 +51,7 @@ watch(
       form.value.constatations = v.constatations ?? ''
       form.value.reserves = v.reserves ?? ''
       form.value.statut_conformite = (v.statut_conformite as string) ?? 'conforme'
-      form.value.montant_receptionne = v.montant_receptionne ?? null
+      form.value.quantite_receptionnee = v.quantite_receptionnee ?? null
       form.value.reception_items = (v.reception_items ?? []).map((i: ReceptionItem) => ({
         ...i,
         quantite_prevue: i.quantite_prevue ?? null,
@@ -101,7 +101,7 @@ const onSubmit = () => {
     constatations: form.value.constatations || undefined,
     reserves: form.value.reserves || undefined,
     statut_conformite: form.value.statut_conformite,
-    montant_receptionne: form.value.montant_receptionne ?? undefined,
+    quantite_receptionnee: form.value.quantite_receptionnee ?? undefined,
   }
   if (form.value.reception_items.length) {
     payload.reception_items = form.value.reception_items.map((i) => ({
@@ -114,6 +114,8 @@ const onSubmit = () => {
   }
   emit('submit', payload)
 }
+
+const formatDate = (d?: string) => (d ? new Date(d).toLocaleDateString('fr-FR') : '-')
 
 const onCancel = () => emit('cancel')
 </script>
@@ -136,6 +138,15 @@ const onCancel = () => emit('cancel')
           label="Date de réception *"
           type="date"
           required
+        />
+      </VCol>
+
+      <VCol v-if="contrat?.date_previsionnelle_reception" cols="12" md="6">
+        <VTextField
+          :model-value="formatDate(contrat.date_previsionnelle_reception)"
+          label="Date prévisionnelle de réception (contrat)"
+          readonly
+          prepend-inner-icon="tabler-calendar-event"
         />
       </VCol>
 
@@ -162,10 +173,11 @@ const onCancel = () => emit('cancel')
       </VCol>
       <VCol cols="12" md="6">
         <VTextField
-          v-model.number="form.montant_receptionne"
-          label="Montant réceptionné (XOF)"
+          v-model.number="form.quantite_receptionnee"
+          label="Quantité réceptionnée"
           type="number"
           min="0"
+          step="0.01"
         />
       </VCol>
       <VCol cols="12">

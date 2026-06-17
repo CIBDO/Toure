@@ -14,6 +14,9 @@ const banquesStore = useBanquesStore()
 const snackbar = ref({ show: false, text: '', color: 'success' })
 const dialog = ref(false)
 const deleteDialog = ref(false)
+const detailsDialog = ref(false)
+const detailsItem = ref<Fournisseur | null>(null)
+const isLoadingDetails = ref(false)
 const isEditing = ref(false)
 const selectedItem = ref<any>(null)
 const searchQuery = ref('')
@@ -95,7 +98,7 @@ const headers = [
   { title: 'Téléphone', key: 'telephone', sortable: false },
   { title: 'Ville', key: 'ville', sortable: true },
   { title: 'Statut', key: 'statut', sortable: true },
-  { title: 'Actions', key: 'actions', sortable: false },
+  { title: 'Actions', key: 'actions', sortable: false, width: '140px' },
 ]
 
 const statutOptions = [
@@ -160,6 +163,22 @@ const openEdit = async (item: any) => {
 const openDelete = (item: any) => {
   selectedItem.value = item
   deleteDialog.value = true
+}
+
+const openDetails = async (item: any) => {
+  isLoadingDetails.value = true
+  detailsDialog.value = true
+  detailsItem.value = null
+  try {
+    detailsItem.value = await store.fetchFournisseur(item.id)
+  }
+  catch {
+    detailsDialog.value = false
+    snackbar.value = { show: true, text: 'Impossible de charger les détails du fournisseur', color: 'error' }
+  }
+  finally {
+    isLoadingDetails.value = false
+  }
 }
 
 const addBanque = () => {
@@ -289,14 +308,20 @@ const confirmDelete = async () => {
               </VChip>
             </template>
             <template #item.actions="{ item }">
-              <VBtn icon variant="text" size="small" color="primary" @click="openEdit(item)">
-                <VIcon icon="tabler-edit" />
-                <VTooltip activator="parent">Modifier</VTooltip>
-              </VBtn>
-              <VBtn icon variant="text" size="small" color="error" @click="openDelete(item)">
-                <VIcon icon="tabler-trash" />
-                <VTooltip activator="parent">Supprimer</VTooltip>
-              </VBtn>
+              <div class="d-flex align-center justify-center gap-0">
+                <VBtn icon variant="text" size="small" color="secondary" @click="openDetails(item)">
+                  <VIcon icon="tabler-eye" />
+                  <VTooltip activator="parent">Voir détails</VTooltip>
+                </VBtn>
+                <VBtn icon variant="text" size="small" color="primary" @click="openEdit(item)">
+                  <VIcon icon="tabler-edit" />
+                  <VTooltip activator="parent">Modifier</VTooltip>
+                </VBtn>
+                <VBtn icon variant="text" size="small" color="error" @click="openDelete(item)">
+                  <VIcon icon="tabler-trash" />
+                  <VTooltip activator="parent">Supprimer</VTooltip>
+                </VBtn>
+              </div>
             </template>
           </VDataTableServer>
         </VCardText>
@@ -552,6 +577,156 @@ const confirmDelete = async () => {
         <VBtn color="primary" prepend-icon="tabler-device-floppy" @click="save">
           {{ isEditing ? 'Enregistrer les modifications' : 'Créer le fournisseur' }}
         </VBtn>
+      </VCardActions>
+    </VCard>
+  </VDialog>
+
+  <!-- ─── Dialog Détails ─── -->
+  <VDialog v-model="detailsDialog" max-width="900" scrollable>
+    <VCard>
+      <VCardTitle class="d-flex align-center gap-2 pa-4">
+        <VIcon icon="tabler-building-store" color="primary" />
+        <template v-if="detailsItem">
+          {{ detailsItem.raison_sociale }}
+          <VChip v-if="detailsItem.sigle" size="x-small" variant="tonal" class="ms-1">{{ detailsItem.sigle }}</VChip>
+        </template>
+        <span v-else>Détails du fournisseur</span>
+        <VSpacer />
+        <VChip v-if="detailsItem" :color="statutColor(detailsItem.statut)" size="small" class="text-capitalize">
+          {{ detailsItem.statut }}
+        </VChip>
+      </VCardTitle>
+      <VDivider />
+
+      <VCardText v-if="isLoadingDetails" class="d-flex justify-center pa-12">
+        <VProgressCircular indeterminate color="primary" />
+      </VCardText>
+
+      <VCardText v-else-if="detailsItem" class="pa-4">
+        <p class="text-subtitle-2 font-weight-bold mb-3">Informations générales</p>
+        <VRow dense>
+          <VCol cols="6" md="3">
+            <p class="text-caption text-medium-emphasis">Code</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.code || '-' }}</p>
+          </VCol>
+          <VCol cols="6" md="3">
+            <p class="text-caption text-medium-emphasis">NIF</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.nif || '-' }}</p>
+          </VCol>
+          <VCol cols="6" md="3">
+            <p class="text-caption text-medium-emphasis">RC</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.rc || '-' }}</p>
+          </VCol>
+          <VCol cols="6" md="3">
+            <p class="text-caption text-medium-emphasis">Domaine</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.domaine_activite?.libelle || '-' }}</p>
+          </VCol>
+          <VCol cols="6" md="4">
+            <p class="text-caption text-medium-emphasis">Téléphone</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.telephone || '-' }}</p>
+          </VCol>
+          <VCol cols="6" md="4">
+            <p class="text-caption text-medium-emphasis">Fax</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.fax || '-' }}</p>
+          </VCol>
+          <VCol cols="6" md="4">
+            <p class="text-caption text-medium-emphasis">Email</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.email || '-' }}</p>
+          </VCol>
+          <VCol cols="12">
+            <p class="text-caption text-medium-emphasis">Adresse</p>
+            <p class="text-body-2 mb-2">
+              {{ [detailsItem.adresse, detailsItem.ville, detailsItem.region, detailsItem.pays].filter(Boolean).join(', ') || '-' }}
+            </p>
+          </VCol>
+          <VCol cols="12">
+            <p class="text-caption text-medium-emphasis">Modes de passation</p>
+            <div class="d-flex flex-wrap gap-1 mb-2">
+              <VChip
+                v-for="mode in (detailsItem.modes_passation ?? [])"
+                :key="mode"
+                size="x-small"
+                variant="tonal"
+                color="info"
+              >
+                {{ modePassationLabel(mode) }}
+              </VChip>
+              <span v-if="!detailsItem.modes_passation?.length" class="text-body-2">-</span>
+            </div>
+          </VCol>
+          <VCol v-if="detailsItem.duree_min || detailsItem.duree_max" cols="12" md="6">
+            <p class="text-caption text-medium-emphasis">Durée consultation</p>
+            <p class="text-body-2 mb-2">
+              {{ detailsItem.duree_min ?? '?' }} — {{ detailsItem.duree_max ?? '?' }} jours
+            </p>
+          </VCol>
+        </VRow>
+
+        <VDivider class="my-3" />
+        <p class="text-subtitle-2 font-weight-bold mb-3">Représentant</p>
+        <VRow dense>
+          <VCol cols="12" md="4">
+            <p class="text-caption text-medium-emphasis">Nom</p>
+            <p class="text-body-2 mb-2">
+              {{ [detailsItem.civilite, detailsItem.representant].filter(Boolean).join(' ') || '-' }}
+            </p>
+          </VCol>
+          <VCol cols="12" md="4">
+            <p class="text-caption text-medium-emphasis">Qualité / Fonction</p>
+            <p class="text-body-2 mb-2">{{ detailsItem.qualite_fonction || detailsItem.fonction_representant || '-' }}</p>
+          </VCol>
+        </VRow>
+
+        <template v-if="detailsItem.banques?.length">
+          <VDivider class="my-3" />
+          <p class="text-subtitle-2 font-weight-bold mb-3">
+            Comptes bancaires
+            <VChip size="x-small" color="primary" class="ms-1">{{ detailsItem.banques.length }}</VChip>
+          </p>
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>Banque</th>
+                <th>N° compte</th>
+                <th>RIB</th>
+                <th>IBAN</th>
+                <th>Principal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="b in detailsItem.banques" :key="b.id ?? b.numero_compte">
+                <td class="text-body-2">{{ b.banque?.libelle || '-' }}</td>
+                <td class="text-body-2">{{ b.numero_compte || '-' }}</td>
+                <td class="text-caption text-medium-emphasis">{{ b.rib || '-' }}</td>
+                <td class="text-caption text-medium-emphasis">{{ b.iban || '-' }}</td>
+                <td class="text-center">
+                  <VIcon v-if="b.principal" icon="tabler-star-filled" color="primary" size="18" />
+                  <VIcon v-else icon="tabler-minus" color="default" size="16" />
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </template>
+
+        <template v-if="detailsItem.observations">
+          <VDivider class="my-3" />
+          <p class="text-subtitle-2 font-weight-bold mb-2">Observations</p>
+          <p class="text-body-2">{{ detailsItem.observations }}</p>
+        </template>
+      </VCardText>
+
+      <VDivider />
+      <VCardActions class="justify-end pa-3">
+        <VBtn
+          v-if="detailsItem"
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-edit"
+          @click="detailsDialog = false; openEdit(detailsItem)"
+        >
+          Modifier
+        </VBtn>
+        <VBtn variant="tonal" @click="detailsDialog = false">Fermer</VBtn>
       </VCardActions>
     </VCard>
   </VDialog>

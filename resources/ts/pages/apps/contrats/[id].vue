@@ -37,6 +37,31 @@ const motifRejet = ref('')
 
 const contratId = computed(() => Number(route.params.id))
 const contrat = computed(() => store.currentContrat)
+const isLoadingContrat = ref(false)
+const loadError = ref<string | null>(null)
+
+const loadContrat = async () => {
+  if (!contratId.value || Number.isNaN(contratId.value)) {
+    loadError.value = 'Identifiant de contrat invalide'
+    return
+  }
+  isLoadingContrat.value = true
+  loadError.value = null
+  try {
+    const data = await store.fetchContrat(contratId.value)
+    if (!data)
+      loadError.value = 'Contrat introuvable'
+  }
+  catch (e: any) {
+    loadError.value = e?.data?.message || 'Impossible de charger le contrat'
+  }
+  finally {
+    isLoadingContrat.value = false
+  }
+}
+
+onMounted(loadContrat)
+watch(contratId, loadContrat)
 
 const etapeLabels: Record<string, string> = {
   elaboration: 'Élaboration',
@@ -92,12 +117,6 @@ const progressionPct = computed(() => {
 })
 
 // ─── Actions contrat ──────────────────────────────────────────────────────────
-
-watch(activeTab, async (tab) => {
-  if (tab === 'finance' && !financeSummary.value) {
-    await loadFinance()
-  }
-})
 
 // ─── Étapes ───────────────────────────────────────────────────────────────────
 const openEtapeEdit = (etape: any) => {
@@ -424,10 +443,15 @@ const hasProvisoireApprovedReception = computed(() =>
   receptionsStore.receptions.some((r: any) => r.type_reception === 'provisoire' && r.statut === 'approved'),
 )
 
-watch(activeTab, (tab) => {
-  if (tab === 'avenants') loadAvenants()
-  if (tab === 'ordre-services') loadOrdreServices()
-  if (tab === 'receptions') loadReceptions()
+watch(activeTab, async (tab) => {
+  if (tab === 'finance' && !financeSummary.value)
+    await loadFinance()
+  if (tab === 'avenants')
+    loadAvenants()
+  if (tab === 'ordre-services')
+    loadOrdreServices()
+  if (tab === 'receptions')
+    loadReceptions()
 })
 
 const avenantStatutColor = (s: string) =>
@@ -498,7 +522,20 @@ const onReceptionFormSubmit = async (payload: Record<string, any>) => {
 </script>
 
 <template>
-  <div v-if="contrat">
+  <div v-if="isLoadingContrat" class="d-flex justify-center align-center pa-12">
+    <VProgressCircular indeterminate color="primary" size="48" />
+  </div>
+
+  <VAlert v-else-if="loadError" type="error" variant="tonal" class="ma-4">
+    {{ loadError }}
+    <template #append>
+      <VBtn variant="text" size="small" @click="router.push({ name: 'apps-contrats' })">
+        Retour à la liste
+      </VBtn>
+    </template>
+  </VAlert>
+
+  <div v-else-if="contrat">
     <!-- ─── Header ─── -->
     <VRow class="mb-4">
       <VCol cols="12">
@@ -699,6 +736,10 @@ const onReceptionFormSubmit = async (payload: Record<string, any>) => {
                     <tr>
                       <td class="text-medium-emphasis text-caption">Date de fin</td>
                       <td>{{ formatDate(contrat.date_fin) }}</td>
+                    </tr>
+                    <tr>
+                      <td class="text-medium-emphasis text-caption">Date prévisionnelle de réception</td>
+                      <td>{{ formatDate(contrat.date_previsionnelle_reception) }}</td>
                     </tr>
                     <tr>
                       <td class="text-medium-emphasis text-caption">Durée d'exécution</td>
@@ -1020,6 +1061,18 @@ const onReceptionFormSubmit = async (payload: Record<string, any>) => {
               class="mb-4"
             >
               Aucune réception ne peut être créée sur un contrat archivé.
+            </VAlert>
+
+            <VAlert
+              v-if="contrat.date_previsionnelle_reception"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+              icon="tabler-calendar-event"
+            >
+              Date prévisionnelle de réception :
+              <strong>{{ formatDate(contrat.date_previsionnelle_reception) }}</strong>
             </VAlert>
 
             <div v-if="contrat.status_execution" class="mb-3">
@@ -1395,10 +1448,6 @@ const onReceptionFormSubmit = async (payload: Record<string, any>) => {
 
       </VTabsWindow>
     </VCard>
-  </div>
-
-  <div v-else class="d-flex justify-center align-center" style="min-height:300px">
-    <VProgressCircular indeterminate color="primary" />
   </div>
 
   <!-- ─── Dialog Mise à jour étape ─── -->

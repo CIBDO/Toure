@@ -29,6 +29,7 @@ export interface Contrat {
   date_signature?: string
   date_debut?: string
   date_fin?: string
+  date_previsionnelle_reception?: string
   duree_execution?: number
   mode_passation?: string
   exercice?: string
