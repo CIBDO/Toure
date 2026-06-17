@@ -17,9 +17,11 @@ class DepouillementRequest extends FormRequest
         $id = $this->route('depouillement');
 
         return [
-            'reference'          => ['required', 'string', 'max:100', Rule::unique('depouillements', 'reference')->ignore($id)->whereNull('deleted_at')],
+            'reference'          => ['nullable', 'string', 'max:100', Rule::unique('depouillements', 'reference')->ignore($id)->whereNull('deleted_at')],
             'avis_id'            => ['required', 'exists:avis,id'],
+            'compte_budget_id'   => ['nullable', 'exists:comptes_budget,id'],
             'date_depouillement' => ['required', 'date'],
+            'heure_depouillement'=> ['nullable', 'date_format:H:i'],
             'lieu'               => ['nullable', 'string', 'max:255'],
             'resultats'          => ['nullable', 'array'],
             'statut'             => ['nullable', Rule::in(['draft', 'submitted', 'approved', 'rejected'])],

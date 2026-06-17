@@ -90,6 +90,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('depouillements/{depouillement}/submit',  [DepouillementController::class, 'submit']);
     Route::post('depouillements/{depouillement}/approve', [DepouillementController::class, 'approve']);
     Route::post('depouillements/{depouillement}/reject',  [DepouillementController::class, 'reject']);
+    Route::get('depouillements/{depouillement}/bordereau', [DepouillementController::class, 'generateBordereau']);
 
     // Passation — PVs
     Route::apiResource('pvs', PvController::class);

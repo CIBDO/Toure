@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useApi } from '@/composables/useApi'
 
-definePage({ meta: { title: 'Dépouillements' } })
+definePage({ meta: { title: 'Ouverture des plis' } })
 
 const snackbar = ref({ show: false, text: '', color: 'success' })
 const dialog = ref(false)
@@ -31,9 +31,10 @@ const isLoading = ref(false)
 const avisFournisseurs = ref<any[]>([])
 
 const emptyForm = () => ({
-  reference: '',
   avis_id: null as number | null,
+  compte_budget_id: null as number | null,
   date_depouillement: '',
+  heure_depouillement: '',
   lieu: '',
   resultats: [] as any[],
   statut: 'draft',
@@ -43,14 +44,33 @@ const emptyForm = () => ({
 const form = ref(emptyForm())
 
 const headers = [
-  { title: 'Référence', key: 'reference', sortable: true },
   { title: 'Avis', key: 'avis', sortable: false },
   { title: 'Date', key: 'date_depouillement', sortable: true },
+  { title: 'Heure', key: 'heure_depouillement', sortable: false },
   { title: 'Lieu', key: 'lieu', sortable: false },
-  { title: 'Offres', key: 'nb_offres', sortable: false },
-  { title: 'Statut', key: 'statut', sortable: true },
+  { title: 'Plis', key: 'nb_plis', sortable: false },
+  { title: 'Attributaire', key: 'attributaire', sortable: false },
   { title: 'Actions', key: 'actions', sortable: false, width: '200px' },
 ]
+
+// Comptes budget (comme dans nouveau contrat)
+const { data: comptesData } = await useApi<any>('/comptes-budget?itemsPerPage=-1').json()
+const comptesList = computed(() =>
+  comptesData.value?.data?.map((c: any) => ({ title: `${c.code} — ${c.libelle}`, value: c.id })) ?? [],
+)
+
+// Normaliser les résultats (compatibilité retenu → attributaire)
+const normalizeResultat = (r: any) => ({
+  ...r,
+  attributaire: r.attributaire ?? r.retenu ?? false,
+  rang: r.rang ?? r.plis ?? 1,
+  pieces_fournies: r.pieces_fournies ?? '',
+})
+
+const getAttributaire = (resultats: any[] | undefined) => {
+  const attr = resultats?.find((r: any) => r.attributaire || r.retenu)
+  return attr?.fournisseur?.raison_sociale || attr?.fournisseur_nom || '-'
+}
 
 const statutOptions = [
   { title: 'Brouillon', value: 'draft' },
@@ -139,7 +159,7 @@ const openEdit = async (item: any) => {
   form.value = {
     ...emptyForm(),
     ...dep,
-    resultats: dep.resultats ?? [],
+    resultats: (dep.resultats ?? []).map(normalizeResultat),
   }
   // Charger les fournisseurs de l'avis lié
   if (dep.avis_id) {
@@ -169,14 +189,14 @@ const addResultat = () => {
     note_technique: null,
     note_financiere: null,
     rang: form.value.resultats.length + 1,
+    pieces_fournies: '',
     observations: '',
-    retenu: false,
+    attributaire: false,
   })
 }
 
 const removeResultat = (index: number) => {
   form.value.resultats.splice(index, 1)
-  // Renuméroter les rangs
   form.value.resultats.forEach((r, i) => { r.rang = i + 1 })
 }
 
@@ -193,7 +213,7 @@ const save = async () => {
     else
       await useApi('/depouillements').post(form.value).json()
     dialog.value = false
-    snackbar.value = { show: true, text: `Dépouillement ${isEditing.value ? 'modifié' : 'créé'} avec succès`, color: 'success' }
+    snackbar.value = { show: true, text: `Ouverture des plis ${isEditing.value ? 'modifiée' : 'créée'} avec succès`, color: 'success' }
     await loadData()
   }
   catch (e: any) {
@@ -205,7 +225,7 @@ const confirmDelete = async () => {
   try {
     await useApi(`/depouillements/${selectedItem.value.id}`).delete().json()
     deleteDialog.value = false
-    snackbar.value = { show: true, text: 'Dépouillement supprimé', color: 'success' }
+    snackbar.value = { show: true, text: 'Ouverture des plis supprimée', color: 'success' }
     await loadData()
   }
   catch {
@@ -217,7 +237,7 @@ const doAction = async (action: 'submit' | 'approve', item: any) => {
   try {
     await useApi(`/depouillements/${item.id}/${action}`).post({}).json()
     const labels = { submit: 'soumis', approve: 'approuvé' }
-    snackbar.value = { show: true, text: `Dépouillement ${labels[action]}`, color: 'success' }
+    snackbar.value = { show: true, text: `Ouverture des plis ${labels[action]}`, color: 'success' }
     await loadData()
   }
   catch {
@@ -229,7 +249,7 @@ const confirmReject = async () => {
   try {
     await useApi(`/depouillements/${selectedItem.value.id}/reject`).post({ motif_rejet: motifRejet.value }).json()
     rejectDialog.value = false
-    snackbar.value = { show: true, text: 'Dépouillement rejeté', color: 'warning' }
+    snackbar.value = { show: true, text: 'Ouverture des plis rejetée', color: 'warning' }
     await loadData()
   }
   catch {
@@ -238,6 +258,11 @@ const confirmReject = async () => {
 }
 
 const formatMontant = (v: number) => v ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(v) : '-'
+
+const formatHeure = (v: string | null | undefined) => {
+  if (!v) return '-'
+  return v.substring(0, 5)
+}
 
 const formatDate = (v: string | null | undefined) => {
   if (!v) return '-'
@@ -254,6 +279,52 @@ const openDetails = async (item: any) => {
   detailsItem.value = data.value
   detailsDialog.value = true
 }
+
+const generatingBordereauId = ref<number | null>(null)
+
+const isGeneratingBordereau = (item: any) => generatingBordereauId.value === item?.id
+
+const downloadBordereau = async (item: any) => {
+  generatingBordereauId.value = item.id
+  try {
+    const baseUrl = (import.meta.env.VITE_API_BASE_URL && String(import.meta.env.VITE_API_BASE_URL)) || '/api'
+    const token = useCookie('accessToken').value
+    const response = await fetch(`${baseUrl}/depouillements/${item.id}/bordereau`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/pdf',
+      },
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err?.message || 'Impossible de générer le bordereau')
+    }
+
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('pdf')) {
+      throw new Error('Le serveur n\'a pas renvoyé un PDF valide')
+    }
+
+    const blob = await response.blob()
+    const name = `bordereau_envoi_${item.reference || item.id}_${new Date().toISOString().slice(0, 10)}.pdf`
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = name
+    a.click()
+    URL.revokeObjectURL(a.href)
+
+    snackbar.value = { show: true, text: 'Bordereau d\'envoi téléchargé', color: 'success' }
+  }
+  catch (e: any) {
+    snackbar.value = { show: true, text: e?.message || 'Erreur lors de la génération du bordereau', color: 'error' }
+  }
+  finally {
+    generatingBordereauId.value = null
+  }
+}
+
+const canGenerateBordereau = (item: any) => (item.resultats?.length ?? 0) > 0
 </script>
 
 <template>
@@ -262,9 +333,9 @@ const openDetails = async (item: any) => {
       <VCard>
         <VCardTitle class="d-flex align-center pa-4">
           <VIcon icon="tabler-clipboard-list" class="me-2" />
-          Dépouillements
+          Ouverture des plis
           <VSpacer />
-          <VBtn prepend-icon="tabler-plus" color="primary" @click="openCreate">Nouveau Dépouillement</VBtn>
+          <VBtn prepend-icon="tabler-plus" color="primary" @click="openCreate">Nouvelle ouverture des plis</VBtn>
         </VCardTitle>
 
         <VDivider />
@@ -275,7 +346,7 @@ const openDetails = async (item: any) => {
             <VCol cols="12" md="3">
               <VTextField
                 v-model="searchQuery"
-                placeholder="Référence..."
+                placeholder="Avis, lieu..."
                 prepend-inner-icon="tabler-search"
                 density="compact"
                 clearable
@@ -316,7 +387,7 @@ const openDetails = async (item: any) => {
             <VRow v-if="showDateFilters" class="mb-3">
               <VCol cols="12">
                 <VCard variant="tonal" color="info" class="pa-3">
-                  <p class="text-caption text-medium-emphasis mb-2">Filtrer par date de dépouillement</p>
+                  <p class="text-caption text-medium-emphasis mb-2">Filtrer par date d'ouverture des plis</p>
                   <VRow>
                     <VCol cols="12" md="6">
                       <VTextField v-model="filterDateFrom" label="Du" type="date" density="compact" />
@@ -347,13 +418,16 @@ const openDetails = async (item: any) => {
                 <span class="text-caption text-medium-emphasis">{{ item.avis?.objet?.substring(0, 40) }}</span>
               </div>
             </template>
-            <template #item.nb_offres="{ item }">
+            <template #item.nb_plis="{ item }">
               <VChip size="x-small" color="info" variant="tonal">
-                {{ item.resultats?.length ?? 0 }} offre(s)
+                {{ item.resultats?.length ?? 0 }} pli(s)
               </VChip>
             </template>
-            <template #item.statut="{ item }">
-              <VChip :color="statutColor(item.statut)" size="small">{{ statutLabel(item.statut) }}</VChip>
+            <template #item.attributaire="{ item }">
+              <span class="text-caption">{{ getAttributaire(item.resultats) }}</span>
+            </template>
+            <template #item.heure_depouillement="{ item }">
+              <span class="text-caption">{{ formatHeure(item.heure_depouillement) }}</span>
             </template>
             <template #item.date_depouillement="{ item }">
               <span class="text-caption">{{ formatDate(item.date_depouillement) }}</span>
@@ -380,6 +454,10 @@ const openDetails = async (item: any) => {
                 <VIcon icon="tabler-x" />
                 <VTooltip activator="parent">Rejeter</VTooltip>
               </VBtn>
+              <VBtn v-if="canGenerateBordereau(item)" icon variant="text" size="small" color="secondary" :loading="isGeneratingBordereau(item)" @click="downloadBordereau(item)">
+                <VIcon icon="tabler-file-type-pdf" />
+                <VTooltip activator="parent">Bordereau d'envoi</VTooltip>
+              </VBtn>
               <VBtn icon variant="text" size="small" color="error" @click="openDelete(item)">
                 <VIcon icon="tabler-trash" />
                 <VTooltip activator="parent">Supprimer</VTooltip>
@@ -393,12 +471,9 @@ const openDetails = async (item: any) => {
 
   <!-- ─── Dialog Création / Édition ─── -->
   <VDialog v-model="dialog" max-width="950" scrollable>
-    <VCard :title="isEditing ? 'Modifier le dépouillement' : 'Nouveau dépouillement'">
+    <VCard :title="isEditing ? 'Modifier l\'ouverture des plis' : 'Nouvelle ouverture des plis'">
       <VCardText>
         <VRow>
-          <VCol cols="12" md="4">
-            <VTextField v-model="form.reference" label="Référence *" placeholder="DEP-2026-001" />
-          </VCol>
           <VCol cols="12" md="8">
             <VSelect
               v-model="form.avis_id"
@@ -408,9 +483,20 @@ const openDetails = async (item: any) => {
             />
           </VCol>
           <VCol cols="12" md="4">
-            <VTextField v-model="form.date_depouillement" label="Date du dépouillement *" type="date" />
+            <VSelect
+              v-model="form.compte_budget_id"
+              :items="comptesList"
+              label="N° compte budgétaire"
+              clearable
+            />
           </VCol>
-          <VCol cols="12" md="8">
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.date_depouillement" label="Date d'ouverture des plis *" type="date" />
+          </VCol>
+          <VCol cols="12" md="4">
+            <VTextField v-model="form.heure_depouillement" label="Heure d'ouverture des plis" type="time" />
+          </VCol>
+          <VCol cols="12" md="4">
             <VTextField v-model="form.lieu" label="Lieu" placeholder="Salle de réunion, Siège CANAM..." />
           </VCol>
           <VCol cols="12">
@@ -418,32 +504,32 @@ const openDetails = async (item: any) => {
           </VCol>
         </VRow>
 
-        <!-- Résultats des offres -->
+        <!-- Résultats des plis -->
         <VDivider class="my-4" />
         <div class="d-flex align-center mb-3">
           <VIcon icon="tabler-trophy" class="me-2" color="primary" />
-          <span class="text-subtitle-1 font-weight-bold">Résultats des offres</span>
+          <span class="text-subtitle-1 font-weight-bold">Résultats des plis</span>
           <VSpacer />
           <VBtn prepend-icon="tabler-plus" size="small" variant="tonal" color="primary" @click="addResultat">
-            Ajouter une offre
+            Ajouter un pli
           </VBtn>
         </div>
 
         <div v-if="form.resultats.length === 0" class="text-center py-4 text-medium-emphasis">
-          <p class="text-body-2">Aucune offre enregistrée. Cliquez sur "Ajouter une offre" pour commencer.</p>
+          <p class="text-body-2">Aucun pli enregistré. Cliquez sur « Ajouter un pli » pour commencer.</p>
         </div>
 
         <div
           v-for="(r, index) in form.resultats"
           :key="index"
           class="mb-3 pa-3 border rounded"
-          :class="r.retenu ? 'border-success' : ''"
+          :class="r.attributaire ? 'border-success' : ''"
         >
           <div class="d-flex align-center mb-2">
-            <VChip :color="r.retenu ? 'success' : 'default'" size="small" class="me-2">
-              Rang {{ r.rang }}
+            <VChip :color="r.attributaire ? 'success' : 'default'" size="small" class="me-2">
+              Pli {{ r.rang }}
             </VChip>
-            <VChip v-if="r.retenu" color="success" size="x-small" prepend-icon="tabler-star">
+            <VChip v-if="r.attributaire" color="success" size="x-small" prepend-icon="tabler-star">
               Attributaire
             </VChip>
             <VSpacer />
@@ -475,7 +561,7 @@ const openDetails = async (item: any) => {
               <VTextField v-model.number="r.montant" label="Montant offre (CFA)" type="number" density="compact" />
             </VCol>
             <VCol cols="12" md="3">
-              <VTextField v-model.number="r.rang" label="Rang" type="number" density="compact" min="1" />
+              <VTextField v-model.number="r.rang" label="Plis" type="number" density="compact" min="1" />
             </VCol>
             <VCol cols="12" md="3">
               <VTextField v-model.number="r.note_technique" label="Note technique /100" type="number" density="compact" min="0" max="100" />
@@ -483,16 +569,19 @@ const openDetails = async (item: any) => {
             <VCol cols="12" md="3">
               <VTextField v-model.number="r.note_financiere" label="Note financière /100" type="number" density="compact" min="0" max="100" />
             </VCol>
+            <VCol cols="12" md="6">
+              <VTextField v-model="r.pieces_fournies" label="Pièces fournies" density="compact" placeholder="Liste des pièces jointes..." />
+            </VCol>
             <VCol cols="12" md="4">
               <VTextField v-model="r.observations" label="Observations" density="compact" />
             </VCol>
             <VCol cols="12" md="2" class="d-flex align-center">
               <VCheckbox
-                v-model="r.retenu"
-                label="Retenu"
+                v-model="r.attributaire"
+                label="Attributaire"
                 color="success"
                 density="compact"
-                @change="r.retenu && form.resultats.forEach((x, i) => { if (i !== index) x.retenu = false })"
+                @change="r.attributaire && form.resultats.forEach((x, i) => { if (i !== index) x.attributaire = false })"
               />
             </VCol>
           </VRow>
@@ -514,10 +603,10 @@ const openDetails = async (item: any) => {
     <VCard>
       <VCardTitle class="d-flex align-center gap-2 pa-4">
         <VIcon icon="tabler-x" color="error" />
-        Rejeter le dépouillement
+        Rejeter l'ouverture des plis
       </VCardTitle>
       <VCardText>
-        <p class="mb-3">Vous allez rejeter le dépouillement <strong>{{ selectedItem?.reference }}</strong>.</p>
+        <p class="mb-3">Vous allez rejeter l'ouverture des plis liée à l'avis <strong>{{ selectedItem?.avis?.reference }}</strong>.</p>
         <VTextarea v-model="motifRejet" label="Motif du rejet *" rows="3" required />
       </VCardText>
       <VCardActions class="justify-end pa-4">
@@ -535,7 +624,7 @@ const openDetails = async (item: any) => {
         Confirmer la suppression
       </VCardTitle>
       <VCardText>
-        Voulez-vous vraiment supprimer le dépouillement <strong>{{ selectedItem?.reference }}</strong> ?
+        Voulez-vous vraiment supprimer cette ouverture des plis (avis <strong>{{ selectedItem?.avis?.reference }}</strong>) ?
       </VCardText>
       <VCardActions class="justify-end pa-4">
         <VBtn variant="tonal" @click="deleteDialog = false">Annuler</VBtn>
@@ -549,7 +638,7 @@ const openDetails = async (item: any) => {
     <VCard v-if="detailsItem">
       <VCardTitle class="d-flex align-center gap-2 pa-4">
         <VIcon icon="tabler-clipboard-list" color="primary" />
-        {{ detailsItem.reference }}
+        Ouverture des plis
         <VSpacer />
         <VChip :color="statutColor(detailsItem.statut)" size="small">{{ statutLabel(detailsItem.statut) }}</VChip>
       </VCardTitle>
@@ -564,8 +653,18 @@ const openDetails = async (item: any) => {
             <p class="text-body-2 mb-2">{{ formatDate(detailsItem.date_depouillement) }}</p>
           </VCol>
           <VCol cols="6" md="3">
+            <p class="text-caption text-medium-emphasis">Heure</p>
+            <p class="text-body-2 mb-2">{{ formatHeure(detailsItem.heure_depouillement) }}</p>
+          </VCol>
+          <VCol cols="6" md="3">
             <p class="text-caption text-medium-emphasis">Lieu</p>
             <p class="text-body-2 mb-2">{{ detailsItem.lieu || '-' }}</p>
+          </VCol>
+          <VCol cols="12" md="3">
+            <p class="text-caption text-medium-emphasis">N° compte budgétaire</p>
+            <p class="text-body-2 mb-2">
+              {{ detailsItem.compte_budget ? `${detailsItem.compte_budget.code} — ${detailsItem.compte_budget.libelle}` : '-' }}
+            </p>
           </VCol>
           <VCol cols="12" md="6">
             <p class="text-caption text-medium-emphasis">Avis de référence</p>
@@ -585,22 +684,23 @@ const openDetails = async (item: any) => {
           </VCol>
         </VRow>
 
-        <!-- Résultats des offres -->
+        <!-- Résultats des plis -->
         <template v-if="detailsItem.resultats?.length">
           <VDivider class="my-3" />
           <p class="text-subtitle-2 font-weight-bold mb-3">
-            Résultats des offres
+            Résultats des plis
             <VChip size="x-small" color="primary" class="ms-1">{{ detailsItem.resultats.length }}</VChip>
           </p>
           <VTable density="compact">
             <thead>
               <tr>
-                <th>Rang</th>
+                <th>Plis</th>
                 <th>Fournisseur</th>
                 <th class="text-right">Montant</th>
-                <th class="text-center">Note tech.</th>
+                <th class="text-center">Note technique</th>
                 <th class="text-center">Note fin.</th>
-                <th class="text-center">Retenu</th>
+                <th>Pièces fournies</th>
+                <th class="text-center">Attributaire</th>
                 <th>Observations</th>
               </tr>
             </thead>
@@ -608,10 +708,10 @@ const openDetails = async (item: any) => {
               <tr
                 v-for="r in detailsItem.resultats"
                 :key="r.id"
-                :class="r.retenu ? 'bg-success-subtle' : ''"
+                :class="(r.attributaire || r.retenu) ? 'bg-success-subtle' : ''"
               >
                 <td>
-                  <VChip :color="r.retenu ? 'success' : 'default'" size="x-small">{{ r.rang }}</VChip>
+                  <VChip :color="(r.attributaire || r.retenu) ? 'success' : 'default'" size="x-small">{{ r.rang }}</VChip>
                 </td>
                 <td>
                   <span class="text-body-2">{{ r.fournisseur?.raison_sociale || r.fournisseur_nom || '-' }}</span>
@@ -619,8 +719,9 @@ const openDetails = async (item: any) => {
                 <td class="text-right text-body-2">{{ formatMontant(r.montant) }}</td>
                 <td class="text-center text-body-2">{{ r.note_technique ?? '-' }}</td>
                 <td class="text-center text-body-2">{{ r.note_financiere ?? '-' }}</td>
+                <td class="text-caption text-medium-emphasis">{{ r.pieces_fournies || '-' }}</td>
                 <td class="text-center">
-                  <VIcon v-if="r.retenu" icon="tabler-star-filled" color="success" size="18" />
+                  <VIcon v-if="r.attributaire || r.retenu" icon="tabler-star-filled" color="success" size="18" />
                   <VIcon v-else icon="tabler-minus" color="default" size="16" />
                 </td>
                 <td class="text-caption text-medium-emphasis">{{ r.observations || '-' }}</td>
@@ -629,12 +730,22 @@ const openDetails = async (item: any) => {
           </VTable>
         </template>
         <div v-else class="text-center py-4 text-medium-emphasis">
-          <p class="text-body-2">Aucune offre enregistrée.</p>
+          <p class="text-body-2">Aucun pli enregistré.</p>
         </div>
 
       </VCardText>
       <VDivider />
       <VCardActions class="justify-end pa-3">
+        <VBtn
+          v-if="canGenerateBordereau(detailsItem)"
+          color="error"
+          variant="tonal"
+          prepend-icon="tabler-file-type-pdf"
+          :loading="isGeneratingBordereau(detailsItem)"
+          @click="downloadBordereau(detailsItem)"
+        >
+          Bordereau d'envoi
+        </VBtn>
         <VBtn variant="tonal" @click="detailsDialog = false">Fermer</VBtn>
       </VCardActions>
     </VCard>

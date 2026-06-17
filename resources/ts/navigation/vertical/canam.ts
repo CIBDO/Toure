@@ -46,7 +46,7 @@ const canamnNavItems: VerticalNavItems = [
         subject: 'Avis',
       },
       {
-        title: 'Dépouillements',
+        title: 'Ouverture des plis',
         icon: { icon: 'tabler-clipboard-list' },
         to: 'apps-passation-depouillements',
         action: 'view',
