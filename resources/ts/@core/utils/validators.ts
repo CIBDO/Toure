@@ -3,9 +3,9 @@ import { isEmpty, isEmptyArray, isNullOrUndefined } from './helpers'
 // 👉 Required Validator
 export const requiredValidator = (value: unknown) => {
   if (isNullOrUndefined(value) || isEmptyArray(value) || value === false)
-    return 'This field is required'
+    return 'Ce champ est obligatoire'
 
-  return !!String(value).trim().length || 'This field is required'
+  return !!String(value).trim().length || 'Ce champ est obligatoire'
 }
 
 // 👉 Email Validator
@@ -16,9 +16,9 @@ export const emailValidator = (value: unknown) => {
   const re = /^(?:[^<>()[\]\\.,;:\s@"]+(?:\.[^<>()[\]\\.,;:\s@"]+)*|".+")@(?:\[\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\]|(?:[a-z\-\d]+\.)+[a-z]{2,})$/i
 
   if (Array.isArray(value))
-    return value.every(val => re.test(String(val))) || 'The Email field must be a valid email'
+    return value.every(val => re.test(String(val))) || 'Veuillez saisir un email valide'
 
-  return re.test(String(value)) || 'The Email field must be a valid email'
+  return re.test(String(value)) || 'Veuillez saisir un email valide'
 }
 
 // 👉 Password Validator
@@ -27,19 +27,19 @@ export const passwordValidator = (password: string) => {
 
   const validPassword = regExp.test(password)
 
-  return validPassword || 'Field must contain at least one uppercase, lowercase, special character and digit with min 8 chars'
+  return validPassword || 'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial'
 }
 
 // 👉 Confirm Password Validator
 export const confirmedValidator = (value: string, target: string) =>
 
-  value === target || 'The Confirm Password field confirmation does not match'
+  value === target || 'Les mots de passe ne correspondent pas'
 
 // 👉 Between Validator
 export const betweenValidator = (value: unknown, min: number, max: number) => {
   const valueAsNumber = Number(value)
 
-  return (Number(min) <= valueAsNumber && Number(max) >= valueAsNumber) || `Enter number between ${min} and ${max}`
+  return (Number(min) <= valueAsNumber && Number(max) >= valueAsNumber) || `Veuillez saisir un nombre entre ${min} et ${max}`
 }
 
 // 👉 Integer Validator
@@ -48,9 +48,9 @@ export const integerValidator = (value: unknown) => {
     return true
 
   if (Array.isArray(value))
-    return value.every(val => /^-?\d+$/.test(String(val))) || 'This field must be an integer'
+    return value.every(val => /^-?\d+$/.test(String(val))) || 'Ce champ doit être un nombre entier'
 
-  return /^-?\d+$/.test(String(value)) || 'This field must be an integer'
+  return /^-?\d+$/.test(String(value)) || 'Ce champ doit être un nombre entier'
 }
 
 // 👉 Regex Validator
@@ -65,7 +65,7 @@ export const regexValidator = (value: unknown, regex: RegExp | string): string |
   if (Array.isArray(value))
     return value.every(val => regexValidator(val, regeX))
 
-  return regeX.test(String(value)) || 'The Regex field format is invalid'
+  return regeX.test(String(value)) || 'Format du champ invalide'
 }
 
 // 👉 Alpha Validator
@@ -73,7 +73,7 @@ export const alphaValidator = (value: unknown) => {
   if (isEmpty(value))
     return true
 
-  return /^[A-Z]*$/i.test(String(value)) || 'The Alpha field may only contain alphabetic characters'
+  return /^[A-Z]*$/i.test(String(value)) || 'Ce champ ne peut contenir que des caractères alphabétiques'
 }
 
 // 👉 URL Validator
@@ -83,7 +83,7 @@ export const urlValidator = (value: unknown) => {
 
   const re = /^https?:\/\/[^\s$.?#].\S*$/
 
-  return re.test(String(value)) || 'URL is invalid'
+  return re.test(String(value)) || 'URL invalide'
 }
 
 // 👉 Length Validator
@@ -91,7 +91,7 @@ export const lengthValidator = (value: unknown, length: number) => {
   if (isEmpty(value))
     return true
 
-  return String(value).length === length || `"The length of the Characters field must be ${length} characters."`
+  return String(value).length === length || `La longueur doit être exactement ${length} caractères`
 }
 
 // 👉 Alpha-dash Validator
@@ -101,5 +101,5 @@ export const alphaDashValidator = (value: unknown) => {
 
   const valueAsString = String(value)
 
-  return /^[\w-]*$/.test(valueAsString) || 'All Character are not valid'
+  return /^[\w-]*$/.test(valueAsString) || 'Certains caractères ne sont pas autorisés'
 }

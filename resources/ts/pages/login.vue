@@ -1,7 +1,6 @@
 <!-- Page de connexion - Plateforme CANAM -->
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
-import { emailValidator, requiredValidator } from '@validators'
 import { VForm } from 'vuetify/components/VForm'
 
 definePage({
@@ -39,14 +38,6 @@ const fieldErrors = ref<Record<string, string>>({
   email: '',
   password: '',
 })
-
-const passwordRules = [
-  requiredValidator,
-  (value: string) => {
-    if (!value) return true
-    return value.length >= 8 || 'Le mot de passe doit contenir au moins 8 caractères'
-  },
-]
 
 const isFormValid = computed(() => {
   const email = credentials.value.email ?? ''
@@ -106,13 +97,6 @@ onMounted(() => {
 
 <template>
   <div class="login-page">
-    <div class="page-grid" />
-    <div class="page-glow glow-left" />
-    <div class="page-glow glow-right" />
-    <div class="floating-orb orb-1" />
-    <div class="floating-orb orb-2" />
-    <div class="floating-orb orb-3" />
-
     <!-- Écran de transition après connexion -->
     <Transition name="fade">
       <div
@@ -137,11 +121,6 @@ onMounted(() => {
       class="login-card"
       :class="{ 'card-hidden': isRedirecting }"
     >
-      <div class="card-accent" />
-      <!-- Blob décoratif haut-gauche (bleu CANAM) -->
-      <div class="blob blob-top-left" />
-      <!-- Blob décoratif bas-droite (or CANAM) -->
-      <div class="blob blob-bottom-right" />
       <!-- Logo CANAM -->
       <div class="login-logo-wrap">
         <img
@@ -199,15 +178,10 @@ onMounted(() => {
             autofocus
             density="comfortable"
             variant="outlined"
-            hide-details="auto"
+            hide-details
             autocomplete="username"
             clearable
             class="login-field"
-            :rules="[
-              requiredValidator,
-              emailValidator,
-              () => !fieldErrors.email || fieldErrors.email,
-            ]"
             :error-messages="fieldErrors.email ? [fieldErrors.email] : []"
           />
         </div>
@@ -221,14 +195,9 @@ onMounted(() => {
             :type="isPasswordVisible ? 'text' : 'password'"
             density="comfortable"
             variant="outlined"
-            hide-details="auto"
+            hide-details
             autocomplete="current-password"
             class="login-field"
-            :rules="[
-              requiredValidator,
-              ...passwordRules,
-              () => !fieldErrors.password || fieldErrors.password,
-            ]"
             :error-messages="fieldErrors.password ? [fieldErrors.password] : []"
             :append-inner-icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
             @click:append-inner="isPasswordVisible = !isPasswordVisible"
@@ -300,114 +269,6 @@ $canam-border: rgba(26, 95, 168, 0.18);
     radial-gradient(circle at bottom right, rgba(235, 195, 51, 0.18), transparent 30%),
     linear-gradient(135deg, #eef4fb 0%, #f8fbff 48%, #f3f7fb 100%);
   overflow: hidden;
-}
-
-.page-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(26, 95, 168, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(26, 95, 168, 0.05) 1px, transparent 1px);
-  background-size: 36px 36px;
-  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.75), transparent 92%);
-  pointer-events: none;
-}
-
-.page-glow,
-.floating-orb {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.page-glow {
-  filter: blur(18px);
-  opacity: 0.65;
-}
-
-.glow-left {
-  width: 320px;
-  height: 320px;
-  top: 8%;
-  left: 8%;
-  background: rgba($canam-blue, 0.16);
-}
-
-.glow-right {
-  width: 280px;
-  height: 280px;
-  right: 10%;
-  bottom: 10%;
-  background: rgba($canam-gold, 0.22);
-}
-
-.floating-orb {
-  z-index: 1;
-  animation: floatDrift 12s ease-in-out infinite;
-}
-
-.orb-1 {
-  width: 18px;
-  height: 18px;
-  top: 16%;
-  right: 18%;
-  background: linear-gradient(135deg, rgba($canam-blue, 0.95), rgba($canam-green, 0.95));
-}
-
-.orb-2 {
-  width: 12px;
-  height: 12px;
-  bottom: 18%;
-  left: 16%;
-  background: linear-gradient(135deg, rgba($canam-gold, 0.95), rgba($canam-red, 0.95));
-  animation-delay: 1.5s;
-}
-
-.orb-3 {
-  width: 22px;
-  height: 22px;
-  top: 42%;
-  left: 12%;
-  background: linear-gradient(135deg, rgba($canam-blue, 0.78), rgba($canam-gold, 0.9));
-  animation-delay: 3s;
-}
-
-@keyframes floatDrift {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -12px, 0); }
-}
-
-// ── Blobs décoratifs ────────────────────────────────────────────
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.blob-top-left {
-  width: 200px;
-  height: 200px;
-  top: -70px;
-  left: -70px;
-  background: radial-gradient(circle at 60% 40%, lighten($canam-blue, 10%) 0%, $canam-blue 70%);
-  opacity: 0.95;
-  animation: blobPulse 6s ease-in-out infinite;
-}
-
-.blob-bottom-right {
-  width: 190px;
-  height: 190px;
-  bottom: -95px;
-  right: -65px;
-  background: radial-gradient(circle at 40% 60%, $canam-gold 0%, $canam-red 70%);
-  opacity: 0.92;
-  animation: blobPulse 6s ease-in-out infinite reverse;
-}
-
-@keyframes blobPulse {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.06); }
 }
 
 // ── Carte ───────────────────────────────────────────────────────
